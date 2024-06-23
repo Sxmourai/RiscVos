@@ -1,0 +1,10 @@
+[unstable]
+build-std-features = ["compiler-builtins-mem"]
+build-std = ["core", "alloc", "compiler_builtins"]
+
+[build]
+target = "riscv64gc-unknown-linux-gnu"
+
+[target.riscv64gc-unknown-linux-gnu]
+linker = "/usr/bin/lld"
+# rustflags = ["-C", "link-arg=--ld-path=/usr/bin/lld"]
