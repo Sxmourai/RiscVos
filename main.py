@@ -9,6 +9,7 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument("launch", default="kernel")
 parser.add_argument("--release", action="store_true")
+parser.add_argument("--target", default="riscv64gc-unknown-linux-gnu", required=False)
 s = 0
 for act in parser._actions:
     if act.dest != "help":
@@ -30,10 +31,10 @@ if args.launch.lower() == "kernel":
     parser.add_argument("--debugger", action="store_true")
     spec_args = parser.parse_args(cmd_spec_args)
     cmd(f"cargo b {profile}")
-    cmd(f"riscv64-linux-gnu-objcopy -O binary --only-section=.text target/riscv64gc-unknown-linux-gnu/{path_profile}/kernel target/kernel")
+    cmd(f"riscv64-linux-gnu-objcopy -O binary --only-section=.text target/{args.target}/{path_profile}/kernel target/kernel")
     # get raw asm: riscv64-linux-gnu-objdump -b binary -m riscv -D target/kernel
     debugger = "-s -S" if spec_args.debugger else ""
-    cmd(f"qemu-system-riscv64 -machine virt -bios none -serial mon:stdio {debugger} -kernel target/riscv64gc-unknown-linux-gnu/{path_profile}/kernel")
+    cmd(f"qemu-system-riscv64 -machine virt -bios none -serial stdio -display none {debugger} -kernel target/{args.target}/{path_profile}/kernel")
     
 if args.launch.lower() == "disasm":
     os.chdir("kernel")
@@ -42,4 +43,4 @@ if args.launch.lower() == "disasm":
         if res != 0:
             exit(res)
         return res
-    cmd(f"riscv64-linux-gnu-objdump -d target/riscv64gc-unknown-linux-gnu/{path_profile}/kernel")
+    cmd(f"riscv64-linux-gnu-objdump -d target/{args.target}/{path_profile}/kernel")

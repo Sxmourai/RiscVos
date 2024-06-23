@@ -2,63 +2,45 @@
 #![no_main]
 
 core::arch::global_asm!("
-.section .init
+.global _start
 
-.option norvc
-
-.type start, @function
-.global start
-start:
-	
-    .cfi_startproc
+_start:
     
-.option push
-.option norelax
-	la gp, global_pointer
-.option pop
-	
-	/* Reset satp */
-	csrw satp, zero
-	
-	/* Setup stack */
-	la sp, stack_top
-	
-	/* Clear the BSS section */
-	la t5, bss_start
-	la t6, bss_end
-bss_clear:
-	sd zero, (t5)
-	addi t5, t5, 8
-	bltu t5, t6, bss_clear
-	
-	la t0, kmain
-	csrw mepc, t0
-	
-	/* Jump to kernel! */
-	tail kmain
-	
-	.cfi_endproc
+    # run only one instance
+    csrr    t0, mhartid
+    bnez    t0, forever
+    
+    # prepare for the loop
+    li      s1, 0x10000000  # UART output register   
+    la      s2, hello       # load string start addr into s2
+    addi    s3, s2, 13      # set up string end addr in s3
 
-    .section .rodata
+loop:
+    lb      s4, 0(s2)       # load next byte at s2 into s4
+    sb      s4, 0(s1)       # write byte to UART register 
+    addi    s2, s2, 1       # increase s2
+    blt     s2, s3, loop    # branch back until end addr (s3) reached
 
-    debug_string:
-            .string \"Hello world\n\"
+forever:
+    wfi
+    j       forever
 
-.end
+
+.section .data
+
+hello:
+  .string \"hello world!\n\"
 ");
 
 #[no_mangle]
-pub unsafe extern "C" fn kmain(a0: usize, a1: usize, a2: usize) -> ! {
-    unsafe { core::ptr::write_volatile(0x10000000 as *mut u8, b'h') }
-    unsafe { core::ptr::write_volatile(0x10000000 as *mut u8, b'h') }
-    unsafe { core::ptr::write_volatile(0x10000000 as *mut u8, b'h') }
-    unsafe { core::ptr::write_volatile(0x10000000 as *mut u8, b'h') }
-    
-    loop {}
+pub unsafe extern "C" fn kmain() -> ! {
+    // unsafe { core::ptr::write_volatile(0x10000004 as *mut u8, b'h') }
+    loop { 
+        unsafe { core::ptr::write_volatile(0x10000000 as *mut u8, b'h') }
+    }
 }
 
-
 #[panic_handler]
-fn _panic(_info: &core::panic::PanicInfo) -> ! {
+fn _panic(_info: &core::panic::PanicInfo) -> !{
     loop {}
 }

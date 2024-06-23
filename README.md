@@ -17,3 +17,7 @@ To launch the kernel (make sure you have qemu and preferably on linux), run:
 ```bash
 python main.py kernel
 ```
+
+
+## Cool resources
+- https://projectf.io
