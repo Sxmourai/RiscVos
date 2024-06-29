@@ -224,8 +224,8 @@ impl Instruction {
                 return name
             }
         }
-        dbg!(self.opcode(), self.fun3(), self.fun7());
-        todo!()
+        println!("Unknown instruction: {:x}", self.0);
+        "unknown" // Could return option ?
     }
     fn _reg_to_str(reg: u32) -> &'static str {
         ["zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", 
@@ -259,11 +259,7 @@ pub fn run(program: Vec<u8>) {
     let vm = VM::new(program);
     for i in 0..vm.program.len()/2 {
         let instruction = Instruction(vm.get_dword(i));
-        dbg!(instruction);
+        if instruction._opcode_name() == "unknown" {break;} // The file currently has some unknown instructions
+        println!("{:?}",instruction);
     }
-    // let instructions_prog = unsafe{Vec::from_raw_parts(program.as_mut_ptr() as *mut u16, program.len()/2, program.len()/2)};
-    // dbg!(&program, instructions_prog);
-    
-    
-    // std::mem::forget(program); // It tries to empty memory twice if not doing this
 }
