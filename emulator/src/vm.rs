@@ -151,6 +151,22 @@ const INSTRUCTIONS_MASKS: [(&'static str, InstructionFormat, u32); 63] = [
     ("CSRRCI", InstructionFormat::I, _mask(0b1110011, 0b111, 0b0)),
 ];
 
+fn add(ins: Instruction) {
+
+}
+fn sub(ins: Instruction) {
+
+}
+fn empty_fun(ins: Instruction) {
+    todo!()
+}
+
+fn exec_func(instruction: Instruction) {
+    let funcs: [LinkedList<(Instruction, fn(Instruction))>; 63] = std::array::from_fn(|_| LinkedList::new());
+
+}
+
+
 // Elements are linked lists of a fun3 and fun7 and the str name
 fn get_ops() -> [LinkedList<(Instruction, &'static str)>; 128] {
     const _L: LinkedList<(Instruction, &'static str)> = LinkedList::new();
