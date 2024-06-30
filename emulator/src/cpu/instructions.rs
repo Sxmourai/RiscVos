@@ -1,14 +1,15 @@
 use std::cell::OnceCell;
 use bit_field::BitField;
-use super::reg::Register;
-use super::raw_instructions::*;
+use super::reg::{Register, RegisterValue};
+use super::{raw_instructions::*, CPU};
 
 const fn _mask(opcode: u32, fun3: u32, fun7: u32) -> InstructionMask {
     InstructionMask(opcode | fun3 << 12 | fun7 << 25)
 }
 
 // Big thanks to https://www.eg.bucknell.edu/~csci206/riscv-converter/Annotated_RISCV_Card.pdf
-pub const INSTRUCTIONS_MASKS: [(&'static str, InstructionFormat, InstructionMask, fn(Instruction)); 63] = [
+// For more info about instructions https://projectf.io/posts/riscv-cheat-sheet/
+pub const INSTRUCTIONS_MASKS: [(&'static str, InstructionFormat, InstructionMask, InstructionFunction); 63] = [
     ("lb",      InstructionFormat::I, _mask(0b0000011, 0b000, 0b0), empty_fun), // ! Do we need to set fun7 ?
     ("lh",      InstructionFormat::I, _mask(0b0000011, 0b001, 0b0), empty_fun),
     ("lw",      InstructionFormat::I, _mask(0b0000011, 0b010, 0b0), empty_fun),
@@ -20,7 +21,7 @@ pub const INSTRUCTIONS_MASKS: [(&'static str, InstructionFormat, InstructionMask
     ("fence",   InstructionFormat::I, _mask(0b0001111, 0b000, 0b0), empty_fun),
     ("fence.i", InstructionFormat::I, _mask(0b0001111, 0b001, 0b0), empty_fun),
     
-    ("addi",    InstructionFormat::I, _mask(0b0010011, 0b000, 0b0), empty_fun),
+    ("addi",    InstructionFormat::I, _mask(0b0010011, 0b000, 0b0), addi),
     ("slli",    InstructionFormat::I, _mask(0b0010011, 0b001, 0b0), empty_fun), // Has funct7 ??
     ("slti",    InstructionFormat::I, _mask(0b0010011, 0b010, 0b0), empty_fun),
     ("sltiu",   InstructionFormat::I, _mask(0b0010011, 0b011, 0b0), empty_fun),
@@ -47,8 +48,8 @@ pub const INSTRUCTIONS_MASKS: [(&'static str, InstructionFormat, InstructionMask
     ("sw",   InstructionFormat::R, _mask(0b0100011, 0b010, 0b0), empty_fun),
     ("sd",   InstructionFormat::R, _mask(0b0100011, 0b011, 0b0), empty_fun),
     ("add",  InstructionFormat::R, _mask(0b0110011, 0b000, 0b0000000), add),
-    ("sub",  InstructionFormat::R, _mask(0b0110011, 0b000, 0b0100000), empty_fun),
-    ("sil",  InstructionFormat::R, _mask(0b0110011, 0b001, 0b0000000), empty_fun),
+    ("sub",  InstructionFormat::R, _mask(0b0110011, 0b000, 0b0100000), sub),
+    ("sll",  InstructionFormat::R, _mask(0b0110011, 0b001, 0b0000000), empty_fun),
     ("slt",  InstructionFormat::R, _mask(0b0110011, 0b010, 0b0000000), empty_fun),
     ("sltu", InstructionFormat::R, _mask(0b0110011, 0b011, 0b0000000), empty_fun),
     ("xor",  InstructionFormat::R, _mask(0b0110011, 0b100, 0b0000000), empty_fun),
@@ -90,7 +91,7 @@ pub const INSTRUCTIONS_MASKS: [(&'static str, InstructionFormat, InstructionMask
 fn get_from_opcode(opcode:u32) -> &'static Vec<InstructionDescription> {
     unsafe{&REVERSE_INSTRUCTIONS_MASKS.get().unwrap()[opcode as usize]}
 }
-fn try_find_instruction_desc(inst: Instruction) -> Option<InstructionDescription> {
+pub fn try_find_instruction_desc(inst: Instruction) -> Option<InstructionDescription> {
     let opcode = inst.opcode();
     let neighbors = get_from_opcode(opcode);
     if neighbors.is_empty() {return None;}
@@ -111,11 +112,12 @@ fn try_find_instruction_desc(inst: Instruction) -> Option<InstructionDescription
     println!("{:?}", inst);
     None
 }
-fn find_instruction_desc(inst: Instruction) -> InstructionDescription {
+pub fn find_instruction_desc(inst: Instruction) -> InstructionDescription {
     try_find_instruction_desc(inst).unwrap()
 }
 
-type InstructionDescription = (&'static str, InstructionFormat, InstructionMask, fn(Instruction));
+type InstructionFunction = fn(RegisterValue, RegisterValue) -> RegisterValue;
+type InstructionDescription = (&'static str, InstructionFormat, InstructionMask, InstructionFunction);
 type _ReverseInstructionsMasks = [Vec<InstructionDescription>; 127];
 pub static mut REVERSE_INSTRUCTIONS_MASKS: OnceCell<_ReverseInstructionsMasks> = OnceCell::new();
 pub fn set_instructions_funcs() {
@@ -146,7 +148,7 @@ impl Instruction {
     pub fn rd(self) -> Register {
         Register::new(self._raw_rd())
     }
-    fn _raw_rd(self) -> u32 {
+    pub fn _raw_rd(self) -> u32 {
         self.0.get_bits(7..=11)
     }
     // 4 bits
@@ -154,7 +156,7 @@ impl Instruction {
     pub fn rs1(self) -> Register {
         Register::new(self._raw_rs1())
     }
-    fn _raw_rs1(self) -> u32 {
+    pub fn _raw_rs1(self) -> u32 {
         self.0.get_bits(15..=19)
     }
     // 4 bits
@@ -162,7 +164,7 @@ impl Instruction {
     pub fn rs2(self) -> Register {
         Register::new(self._raw_rs2())
     }
-    fn _raw_rs2(self) -> u32 {
+    pub fn _raw_rs2(self) -> u32 {
         self.0.get_bits(20..=24)
     }
     // 2 bits (more info about operation)
@@ -192,6 +194,53 @@ impl Instruction {
         // println!("Unknown instruction: {:x}", self.0);
         // "unknown" // Could return option ?
     }
+
+    pub fn destination(self) -> Destination {
+        match self.format() {
+            InstructionFormat::R => Destination::CpuRegister(self.rd()),
+            InstructionFormat::I => Destination::CpuRegister(self.rd()),
+            InstructionFormat::S => Destination::Immediate(self.0.get_bits(7..=11) | (self.0.get_bits(25..=31) << 5)),
+            InstructionFormat::B => Destination::Immediate((self.0.get_bits(8..=11)<<1) | (self.0.get_bits(25..=30) << 4) | ((self.0 & (1<<7))<<11) | ((self.0 & (1<<31))<<12)),
+            InstructionFormat::U => Destination::CpuRegister(self.rd()),
+            InstructionFormat::J => Destination::CpuRegister(self.rd()),
+        }
+    }
+    pub fn s1(self) -> Destination {
+        match self.format() {
+            InstructionFormat::R => Destination::CpuRegister(self.rs1()),
+            InstructionFormat::I => Destination::CpuRegister(self.rs1()),
+            InstructionFormat::S => Destination::CpuRegister(self.rs1()),
+            InstructionFormat::B => Destination::CpuRegister(self.rs1()),
+            InstructionFormat::U => Destination::Immediate(self.0 & 0xFFFFF000),
+            InstructionFormat::J => Destination::Immediate((self.0.get_bits(21..=30)<<1) | (self.0.get_bits(20..=20)<<11) | (self.0 & 0x7F000) | (self.0.get_bits(31..=31)<<20)),
+        }
+    }
+    pub fn s2(self) -> Destination {
+        match self.format() {
+            InstructionFormat::R => Destination::CpuRegister(self.rs2()),
+            InstructionFormat::I => Destination::Immediate(self.0.get_bits(20..=31)),
+            InstructionFormat::S => Destination::CpuRegister(self.rs2()),
+            InstructionFormat::B => Destination::CpuRegister(self.rs2()),
+            InstructionFormat::U => {println!("WARN: Trying to get s2 of a U format");Destination::Immediate(0)}, // No rs2
+            InstructionFormat::J => {println!("WARN: Trying to get s2 of a J format");Destination::Immediate(0)}, // No rs2
+        }
+    }
+
+}
+#[derive(Debug)]
+pub enum Destination {
+    CpuRegister(Register),
+    Immediate(u32),
+}
+
+impl std::fmt::Display for Destination {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let val = match self {
+            Destination::CpuRegister(reg) => super::reg::REGS[reg.0 as usize].to_string(),
+            Destination::Immediate(imm) => format!("{}", imm),
+        };
+        f.write_fmt(format_args!("{}", val))
+    }
 }
 impl std::fmt::Debug for Instruction {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> { 
@@ -200,7 +249,7 @@ impl std::fmt::Debug for Instruction {
 }
 impl std::fmt::Display for Instruction {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> { 
-        fmt.write_str(&format!("{} {} {} {}", self._opcode_name(), self.rd(), self.rs1(), self.rs2()))
+        fmt.write_str(&format!("{} {} {} {}", self._opcode_name(), self.destination(), self.s1(), self.s2()))
     }
 }
 
@@ -242,17 +291,11 @@ pub fn parse_r(i: Instruction) -> (Register, Register, Register) {
     (i.rd(),i.rs1(),i.rs2())
 }
 
-pub fn empty_fun(ins: Instruction) {
-    dbg!(ins);
-    println!("Unsupported function ! {}", ins);
+pub fn empty_fun(rs1:RegisterValue, rs2:RegisterValue) -> RegisterValue {
+    dbg!(rs1,rs2);
+    println!("Unsupported function !");
+    0
 }
-
-pub fn exec_func(instruction: Instruction) {
-    let (_name, _fmt, _mask, fun) = find_instruction_desc(instruction);
-    fun(instruction);
-    // println!("Instruction not found \"{:?}\"", instruction);
-}
-
 
 // Not used but can be usefull for documentation
 
