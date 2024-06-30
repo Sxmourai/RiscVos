@@ -154,6 +154,13 @@ const INSTRUCTIONS_MASKS: [(&'static str, InstructionFormat, InstructionMask, fn
     ("CSRRCI", InstructionFormat::I, _mask(0b1110011, 0b111, 0b0), empty_fun),
 ];
 
+// rDestination, rS1, rS2
+fn parse_r(i: Instruction) -> (Register, Register, Register) {
+    (i.rd(),i.rs1(),i.rs2())
+}
+
+
+
 fn add(ins: Instruction) {
     dbg!(ins);
 }
@@ -229,17 +236,26 @@ impl Instruction {
     // Only usefull if instruction is of type R, I, U, J
     // Destination register
     // 4 bits
-    pub fn rd(self) -> u32 {
+    pub fn rd(self) -> Register {
+        Register::new(self._raw_rd())
+    }
+    fn _raw_rd(self) -> u32 {
         self.0.get_bits(7..=11)
     }
     // 4 bits
     // Register source 1
-    pub fn rs1(self) -> u32 {
+    pub fn rs1(self) -> Register {
+        Register::new(self._raw_rs1())
+    }
+    fn _raw_rs1(self) -> u32 {
         self.0.get_bits(15..=19)
     }
     // 4 bits
     // Register source 2
-    pub fn rs2(self) -> u32 {
+    pub fn rs2(self) -> Register {
+        Register::new(self._raw_rs2())
+    }
+    fn _raw_rs2(self) -> u32 {
         self.0.get_bits(20..=24)
     }
     // 2 bits (more info about operation)
@@ -269,24 +285,15 @@ impl Instruction {
         // println!("Unknown instruction: {:x}", self.0);
         // "unknown" // Could return option ?
     }
-    fn _reg_to_str(reg: u32) -> &'static str {
-        ["zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", 
-        "s0", "s1", // or "fp"
-        "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", 
-        "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11",
-        "t3","t4","t5","t6",
-        "ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "ft6", "ft7", 
-        "fs0", "fs1",
-        "fa0", "fa1",
-        "fa2","fa3","fa4","fa5","fa6","fa7",
-        "fs2", "fs3", "fs4", "fs5", "fs6", "fs7", "fs8", "fs9", "fs10", "fs11",
-        "ft8","ft9","ft10","ft11",
-        ][reg as usize]
-        // match reg {
-        //     0 => "zero",
-        //     1 => "ra"
-        //     _ => {todo!()}
-        // }
+}
+impl std::fmt::Debug for Instruction {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> { 
+        fmt.write_str(&format!("{:b} {:b} {:b} {:b}", self.opcode(), self.fun3(), self.fun7(), self.0))
+    }
+}
+impl std::fmt::Display for Instruction {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> { 
+        fmt.write_str(&format!("{} {} {} {}", self._opcode_name(), self.rd(), self.rs1(), self.rs2()))
     }
 }
 #[derive(Clone, Copy, Debug)]
@@ -309,24 +316,39 @@ impl InstructionMask {
         false
     }
 }
-impl std::fmt::Debug for Instruction {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> { 
-        fmt.write_str(&format!("{:b} {:b} {:b} {:b}", self.opcode(), self.fun3(), self.fun7(), self.0))
+
+const REGS: [&'static str; 64] = ["zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", 
+    "s0", "s1", // or "fp"
+    "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", 
+    "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11",
+    "t3","t4","t5","t6",
+    "ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "ft6", "ft7", 
+    "fs0", "fs1",
+    "fa0", "fa1",
+    "fa2","fa3","fa4","fa5","fa6","fa7",
+    "fs2", "fs3", "fs4", "fs5", "fs6", "fs7", "fs8", "fs9", "fs10", "fs11",
+    "ft8","ft9","ft10","ft11",
+];
+#[derive(Clone, Copy, Debug)]
+pub struct Register(pub u32);
+impl Register {
+    pub fn new(reg: u32) -> Self {
+        if reg as usize > REGS.len() {todo!()}
+        let s = Self(reg);
+        s
     }
 }
-impl std::fmt::Display for Instruction {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> { 
-        fmt.write_str(&format!("{} {} {} {}", self._opcode_name(), Self::_reg_to_str(self.rd()), Self::_reg_to_str(self.rs1()), Self::_reg_to_str(self.rs2())))
+impl std::fmt::Display for Register {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        f.write_str(REGS[self.0 as usize])
     }
 }
-
-
 pub fn run(program: Vec<u8>) {
     set_instructions_funcs();
     let vm = VM::new(program);
-    for i in 0..vm.program.len()/2 {
+    for i in 0..vm.program.len()/core::mem::size_of::<u32>() {
         let instruction = Instruction::new(vm.get_dword(i));
-        if instruction.is_none() {break;} // The file currently has some unknown instructions
+        // if instruction.is_none() {break;} // The file currently has some unknown instructions
         let instruction = instruction.unwrap();
         println!("{}",instruction);
         exec_func(instruction)
