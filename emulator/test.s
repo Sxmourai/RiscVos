@@ -7,3 +7,7 @@ _start:
     add t3, t1, t3
     sub t3, t3, t3
     addi t3, t1, 10
+
+_loop:
+    add t3, t3, t3
+    j 0x20

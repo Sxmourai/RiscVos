@@ -9,84 +9,81 @@ const fn _mask(opcode: u32, fun3: u32, fun7: u32) -> InstructionMask {
 
 // Big thanks to https://www.eg.bucknell.edu/~csci206/riscv-converter/Annotated_RISCV_Card.pdf
 // For more info about instructions https://projectf.io/posts/riscv-cheat-sheet/
-pub const INSTRUCTIONS_MASKS: [(&'static str, InstructionFormat, InstructionMask, InstructionFunction); 63] = [
-    ("lb",      InstructionFormat::I, _mask(0b0000011, 0b000, 0b0), empty_fun), // ! Do we need to set fun7 ?
-    ("lh",      InstructionFormat::I, _mask(0b0000011, 0b001, 0b0), empty_fun),
-    ("lw",      InstructionFormat::I, _mask(0b0000011, 0b010, 0b0), empty_fun),
-    ("ld",      InstructionFormat::I, _mask(0b0000011, 0b011, 0b0), empty_fun),
-    ("lbu",     InstructionFormat::I, _mask(0b0000011, 0b100, 0b0), empty_fun),
-    ("lhu",     InstructionFormat::I, _mask(0b0000011, 0b110, 0b0), empty_fun),
-    ("lwu",     InstructionFormat::I, _mask(0b0000011, 0b111, 0b0), empty_fun),
+pub const INSTRUCTIONS_MASKS: [(&'static str, InstructionFormat, InstructionMask, InstructionFunction); 59] = [
+    ("lb",      InstructionFormat::I, _mask(0b0000011, 0b000, 0b0), crate::cpu::raw_instructions::lb), // ! Do we need to set fun7 ?
+    ("lh",      InstructionFormat::I, _mask(0b0000011, 0b001, 0b0), crate::cpu::raw_instructions::lh),
+    ("lw",      InstructionFormat::I, _mask(0b0000011, 0b010, 0b0), crate::cpu::raw_instructions::lw),
+    ("ld",      InstructionFormat::I, _mask(0b0000011, 0b011, 0b0), crate::cpu::raw_instructions::ld),
+    ("lbu",     InstructionFormat::I, _mask(0b0000011, 0b100, 0b0), crate::cpu::raw_instructions::lbu),
+    ("lhu",     InstructionFormat::I, _mask(0b0000011, 0b110, 0b0), crate::cpu::raw_instructions::lhu),
+    ("lwu",     InstructionFormat::I, _mask(0b0000011, 0b111, 0b0), crate::cpu::raw_instructions::lwu),
     
-    ("fence",   InstructionFormat::I, _mask(0b0001111, 0b000, 0b0), empty_fun),
-    ("fence.i", InstructionFormat::I, _mask(0b0001111, 0b001, 0b0), empty_fun),
+    ("fence",   InstructionFormat::I, _mask(0b0001111, 0b000, 0b0), crate::cpu::raw_instructions::fence),
+    ("fence.i", InstructionFormat::I, _mask(0b0001111, 0b001, 0b0), crate::cpu::raw_instructions::fencei),
     
-    ("addi",    InstructionFormat::I, _mask(0b0010011, 0b000, 0b0), addi),
-    ("slli",    InstructionFormat::I, _mask(0b0010011, 0b001, 0b0), empty_fun), // Has funct7 ??
-    ("slti",    InstructionFormat::I, _mask(0b0010011, 0b010, 0b0), empty_fun),
-    ("sltiu",   InstructionFormat::I, _mask(0b0010011, 0b011, 0b0), empty_fun),
-    ("xori",    InstructionFormat::I, _mask(0b0010011, 0b100, 0b0), empty_fun),
-    ("srli",    InstructionFormat::I, _mask(0b0010011, 0b101, 0b0000000), empty_fun),
-    ("srai",    InstructionFormat::I, _mask(0b0010011, 0b101, 0b0100000), empty_fun),
-    ("ori",     InstructionFormat::I, _mask(0b0010011, 0b110, 0b0), empty_fun),
-    ("andi",    InstructionFormat::I, _mask(0b0010011, 0b111, 0b0), empty_fun),
+    ("addi",    InstructionFormat::I, _mask(0b0010011, 0b000, 0b0), crate::cpu::raw_instructions::addi),
+    ("slli",    InstructionFormat::I, _mask(0b0010011, 0b001, 0b0), crate::cpu::raw_instructions::slli), // Has funct7 ??
+    ("slti",    InstructionFormat::I, _mask(0b0010011, 0b010, 0b0), crate::cpu::raw_instructions::slti),
+    ("sltiu",   InstructionFormat::I, _mask(0b0010011, 0b011, 0b0), crate::cpu::raw_instructions::sltiu),
+    ("xori",    InstructionFormat::I, _mask(0b0010011, 0b100, 0b0), crate::cpu::raw_instructions::xori),
+    ("srli",    InstructionFormat::I, _mask(0b0010011, 0b101, 0b0000000), crate::cpu::raw_instructions::srli),
+    ("srai",    InstructionFormat::I, _mask(0b0010011, 0b101, 0b0100000), crate::cpu::raw_instructions::srai),
+    ("ori",     InstructionFormat::I, _mask(0b0010011, 0b110, 0b0), crate::cpu::raw_instructions::ori),
+    ("andi",    InstructionFormat::I, _mask(0b0010011, 0b111, 0b0), crate::cpu::raw_instructions::andi),
     
-    ("auipc",   InstructionFormat::U, _mask(0b0010111, 0b000, 0b0), empty_fun),
+    ("auipc",   InstructionFormat::U, _mask(0b0010111, 0b000, 0b0), crate::cpu::raw_instructions::auipc),
     
-    ("addiw",   InstructionFormat::I, _mask(0b0011011, 0b000, 0b0), empty_fun),
-    ("slliw",   InstructionFormat::I, _mask(0b0011011, 0b001, 0b0000000), empty_fun),
-    ("srliw",   InstructionFormat::I, _mask(0b0011011, 0b101, 0b0000000), empty_fun),
-    ("sraiw",   InstructionFormat::I, _mask(0b0011011, 0b101, 0b0100000), empty_fun),
+    ("addiw",   InstructionFormat::I, _mask(0b0011011, 0b000, 0b0), crate::cpu::raw_instructions::addiw),
+    ("slliw",   InstructionFormat::I, _mask(0b0011011, 0b001, 0b0000000), crate::cpu::raw_instructions::slliw),
+    ("srliw",   InstructionFormat::I, _mask(0b0011011, 0b101, 0b0000000), crate::cpu::raw_instructions::srliw),
+    ("sraiw",   InstructionFormat::I, _mask(0b0011011, 0b101, 0b0100000), crate::cpu::raw_instructions::sraiw),
 
-    ("sb",   InstructionFormat::S, _mask(0b0100011, 0b000, 0b0), empty_fun),
-    ("sh",   InstructionFormat::S, _mask(0b0100011, 0b001, 0b0), empty_fun),
-    ("sw",   InstructionFormat::S, _mask(0b0100011, 0b010, 0b0), empty_fun),
-    ("sd",   InstructionFormat::S, _mask(0b0100011, 0b011, 0b0), empty_fun),
+    ("sb",   InstructionFormat::S, _mask(0b0100011, 0b000, 0b0), crate::cpu::raw_instructions::sb),
+    ("sh",   InstructionFormat::S, _mask(0b0100011, 0b001, 0b0), crate::cpu::raw_instructions::sh),
+    ("sw",   InstructionFormat::S, _mask(0b0100011, 0b010, 0b0), crate::cpu::raw_instructions::sw),
+    ("sd",   InstructionFormat::S, _mask(0b0100011, 0b011, 0b0), crate::cpu::raw_instructions::sd),
 
-    ("sb",   InstructionFormat::R, _mask(0b0100011, 0b000, 0b0), empty_fun),
-    ("sh",   InstructionFormat::R, _mask(0b0100011, 0b001, 0b0), empty_fun),
-    ("sw",   InstructionFormat::R, _mask(0b0100011, 0b010, 0b0), empty_fun),
-    ("sd",   InstructionFormat::R, _mask(0b0100011, 0b011, 0b0), empty_fun),
-    ("add",  InstructionFormat::R, _mask(0b0110011, 0b000, 0b0000000), add),
-    ("sub",  InstructionFormat::R, _mask(0b0110011, 0b000, 0b0100000), sub),
-    ("sll",  InstructionFormat::R, _mask(0b0110011, 0b001, 0b0000000), empty_fun),
-    ("slt",  InstructionFormat::R, _mask(0b0110011, 0b010, 0b0000000), empty_fun),
-    ("sltu", InstructionFormat::R, _mask(0b0110011, 0b011, 0b0000000), empty_fun),
-    ("xor",  InstructionFormat::R, _mask(0b0110011, 0b100, 0b0000000), empty_fun),
-    ("srl",  InstructionFormat::R, _mask(0b0110011, 0b101, 0b0000000), empty_fun),
-    ("sra",  InstructionFormat::R, _mask(0b0110011, 0b101, 0b0100000), empty_fun),
-    ("or",   InstructionFormat::R, _mask(0b0110011, 0b110, 0b0000000), empty_fun),
-    ("and",  InstructionFormat::R, _mask(0b0110011, 0b111, 0b0000000), empty_fun),
+    ("add",  InstructionFormat::R, _mask(0b0110011, 0b000, 0b0000000), crate::cpu::raw_instructions::add),
+    ("sub",  InstructionFormat::R, _mask(0b0110011, 0b000, 0b0100000), crate::cpu::raw_instructions::sub),
+    ("sll",  InstructionFormat::R, _mask(0b0110011, 0b001, 0b0000000), crate::cpu::raw_instructions::sll),
+    ("slt",  InstructionFormat::R, _mask(0b0110011, 0b010, 0b0000000), crate::cpu::raw_instructions::slt),
+    ("sltu", InstructionFormat::R, _mask(0b0110011, 0b011, 0b0000000), crate::cpu::raw_instructions::sltu),
+    ("xor",  InstructionFormat::R, _mask(0b0110011, 0b100, 0b0000000), crate::cpu::raw_instructions::xor),
+    ("srl",  InstructionFormat::R, _mask(0b0110011, 0b101, 0b0000000), crate::cpu::raw_instructions::srl),
+    ("sra",  InstructionFormat::R, _mask(0b0110011, 0b101, 0b0100000), crate::cpu::raw_instructions::sra),
+    ("or",   InstructionFormat::R, _mask(0b0110011, 0b110, 0b0000000), crate::cpu::raw_instructions::or),
+    ("and",  InstructionFormat::R, _mask(0b0110011, 0b111, 0b0000000), crate::cpu::raw_instructions::and),
 
-    ("lui",  InstructionFormat::U, _mask(0b0110111, 0b0, 0b0), empty_fun),
+    ("lui",  InstructionFormat::U, _mask(0b0110111, 0b0, 0b0), crate::cpu::raw_instructions::lui),
     
-    ("addw", InstructionFormat::R, _mask(0b0111011, 0b000, 0b0000000), empty_fun),
-    ("subw", InstructionFormat::R, _mask(0b0111011, 0b000, 0b0100000), empty_fun),
-    ("sllw", InstructionFormat::R, _mask(0b0111011, 0b001, 0b0000000), empty_fun),
-    ("srllw",InstructionFormat::R, _mask(0b0111011, 0b101, 0b0000000), empty_fun),
-    ("sraw", InstructionFormat::R, _mask(0b0111011, 0b101, 0b0100000), empty_fun),
+    ("addw", InstructionFormat::R, _mask(0b0111011, 0b000, 0b0000000), crate::cpu::raw_instructions::addw),
+    ("subw", InstructionFormat::R, _mask(0b0111011, 0b000, 0b0100000), crate::cpu::raw_instructions::subw),
+    ("sllw", InstructionFormat::R, _mask(0b0111011, 0b001, 0b0000000), crate::cpu::raw_instructions::sllw),
+    ("srllw",InstructionFormat::R, _mask(0b0111011, 0b101, 0b0000000), crate::cpu::raw_instructions::srllw),
+    ("sraw", InstructionFormat::R, _mask(0b0111011, 0b101, 0b0100000), crate::cpu::raw_instructions::sraw),
 
-    ("beq",  InstructionFormat::B, _mask(0b1100011, 0b000, 0b0), empty_fun),
-    ("bne",  InstructionFormat::B, _mask(0b1100011, 0b001, 0b0), empty_fun),
-    ("bit",  InstructionFormat::B, _mask(0b1100011, 0b100, 0b0), empty_fun),
-    ("bge",  InstructionFormat::B, _mask(0b1100011, 0b101, 0b0), empty_fun),
-    ("bitu", InstructionFormat::B, _mask(0b1100011, 0b110, 0b0), empty_fun),
-    ("bgeu", InstructionFormat::B, _mask(0b1100011, 0b111, 0b0), empty_fun),
+    ("beq",  InstructionFormat::B, _mask(0b1100011, 0b000, 0b0), crate::cpu::raw_instructions::beq),
+    ("bne",  InstructionFormat::B, _mask(0b1100011, 0b001, 0b0), crate::cpu::raw_instructions::bne),
+    ("bit",  InstructionFormat::B, _mask(0b1100011, 0b100, 0b0), crate::cpu::raw_instructions::bit),
+    ("bge",  InstructionFormat::B, _mask(0b1100011, 0b101, 0b0), crate::cpu::raw_instructions::bge),
+    ("bitu", InstructionFormat::B, _mask(0b1100011, 0b110, 0b0), crate::cpu::raw_instructions::bitu),
+    ("bgeu", InstructionFormat::B, _mask(0b1100011, 0b111, 0b0), crate::cpu::raw_instructions::bgeu),
 
-    ("jalr", InstructionFormat::I, _mask(0b1100111, 0b111, 0b0), empty_fun),
-    
-    ("jal",  InstructionFormat::J, _mask(0b1101111, 0b0, 0b0), empty_fun),
+    ("jalr", InstructionFormat::I, _mask(0b1100111, 0b000, 0b0), crate::cpu::raw_instructions::jalr),
+    ("jal",  InstructionFormat::U, _mask(0b1101111, 0b0, 0b0), crate::cpu::raw_instructions::jal),
 
-    ("ecall",  InstructionFormat::I, _mask(0b1110011, 0b0, 0b0), empty_fun), // Immediates (fun7)
-    ("ebreak", InstructionFormat::I, _mask(0b1110011, 0b0, 0b1), empty_fun),
+    ("ecall",  InstructionFormat::I, _mask(0b1110011, 0b0, 0b0), crate::cpu::raw_instructions::ecall), // Immediates (fun7)
+    ("ebreak", InstructionFormat::I, _mask(0b1110011, 0b0, 0b1), crate::cpu::raw_instructions::ebreak),
 
-    ("CSRRW",  InstructionFormat::I, _mask(0b1110011, 0b001, 0b0), empty_fun),
-    ("CSRRS",  InstructionFormat::I, _mask(0b1110011, 0b010, 0b0), empty_fun),
-    ("CSRRC",  InstructionFormat::I, _mask(0b1110011, 0b011, 0b0), empty_fun),
-    ("CSRRWI", InstructionFormat::I, _mask(0b1110011, 0b101, 0b0), empty_fun),
-    ("CSRRSI", InstructionFormat::I, _mask(0b1110011, 0b110, 0b0), empty_fun),
-    ("CSRRCI", InstructionFormat::I, _mask(0b1110011, 0b111, 0b0), empty_fun),
+    ("CSRRW",  InstructionFormat::I, _mask(0b1110011, 0b001, 0b0), crate::cpu::raw_instructions::CSRRW),
+    ("CSRRS",  InstructionFormat::I, _mask(0b1110011, 0b010, 0b0), crate::cpu::raw_instructions::CSRRS),
+    ("CSRRC",  InstructionFormat::I, _mask(0b1110011, 0b011, 0b0), crate::cpu::raw_instructions::CSRRC),
+    ("CSRRWI", InstructionFormat::I, _mask(0b1110011, 0b101, 0b0), crate::cpu::raw_instructions::CSRRWI),
+    ("CSRRSI", InstructionFormat::I, _mask(0b1110011, 0b110, 0b0), crate::cpu::raw_instructions::CSRRSI),
+    ("CSRRCI", InstructionFormat::I, _mask(0b1110011, 0b111, 0b0), crate::cpu::raw_instructions::CSRRCI),
 ];
+
+
 
 fn get_from_opcode(opcode:u32) -> &'static Vec<InstructionDescription> {
     unsafe{&REVERSE_INSTRUCTIONS_MASKS.get().unwrap()[opcode as usize]}
@@ -109,14 +106,13 @@ pub fn try_find_instruction_desc(inst: Instruction) -> Option<InstructionDescrip
             return Some((_name, fmt, *mask, *fun))
         }
     }
-    println!("{:?}", inst);
+    println!("Didn't find instruction description: {:b}", inst.0);
     None
 }
 pub fn find_instruction_desc(inst: Instruction) -> InstructionDescription {
     try_find_instruction_desc(inst).unwrap()
 }
 
-type InstructionFunction = fn(RegisterValue, RegisterValue) -> RegisterValue;
 type InstructionDescription = (&'static str, InstructionFormat, InstructionMask, InstructionFunction);
 type _ReverseInstructionsMasks = [Vec<InstructionDescription>; 127];
 pub static mut REVERSE_INSTRUCTIONS_MASKS: OnceCell<_ReverseInstructionsMasks> = OnceCell::new();
@@ -205,14 +201,15 @@ impl Instruction {
             InstructionFormat::J => Destination::CpuRegister(self.rd()),
         }
     }
-    pub fn s1(self) -> Destination {
+    // Returns the first input and tells if there is a second input (see `self.s2`)
+    pub fn s1(self) -> (Destination, bool) {
         match self.format() {
-            InstructionFormat::R => Destination::CpuRegister(self.rs1()),
-            InstructionFormat::I => Destination::CpuRegister(self.rs1()),
-            InstructionFormat::S => Destination::CpuRegister(self.rs1()),
-            InstructionFormat::B => Destination::CpuRegister(self.rs1()),
-            InstructionFormat::U => Destination::Immediate(self.0 & 0xFFFFF000),
-            InstructionFormat::J => Destination::Immediate((self.0.get_bits(21..=30)<<1) | (self.0.get_bits(20..=20)<<11) | (self.0 & 0x7F000) | (self.0.get_bits(31..=31)<<20)),
+            InstructionFormat::R => (Destination::CpuRegister(self.rs1()), true),
+            InstructionFormat::I => (Destination::CpuRegister(self.rs1()), true),
+            InstructionFormat::S => (Destination::CpuRegister(self.rs1()), true),
+            InstructionFormat::B => (Destination::CpuRegister(self.rs1()), true),
+            InstructionFormat::U => (Destination::Immediate(self.0 & 0xFFFFF000), false),
+            InstructionFormat::J => (Destination::Immediate((self.0.get_bits(21..=30)<<1) | (self.0.get_bits(20..=20)<<11) | (self.0.get_bits(12..=19)<<12) | (self.0.get_bits(31..=31)<<20)), false),
         }
     }
     pub fn s2(self) -> Destination {
@@ -225,8 +222,21 @@ impl Instruction {
             InstructionFormat::J => {println!("WARN: Trying to get s2 of a J format");Destination::Immediate(0)}, // No rs2
         }
     }
-
 }
+impl std::fmt::Debug for Instruction {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> { 
+        fmt.write_str(&format!("{:b} {:b} {:b} {:b}", self.opcode(), self.fun3(), self.fun7(), self.0))
+    }
+}
+impl std::fmt::Display for Instruction {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let (s1, has_s2) = self.s1();
+        let s2 = if has_s2 {self.s2()} else {Destination::Immediate(0)};
+        fmt.write_str(&format!("{} {} {} {}", self._opcode_name(), self.destination(), s1, s2))
+    }
+}
+
+
 #[derive(Debug)]
 pub enum Destination {
     CpuRegister(Register),
@@ -240,16 +250,6 @@ impl std::fmt::Display for Destination {
             Destination::Immediate(imm) => format!("{}", imm),
         };
         f.write_fmt(format_args!("{}", val))
-    }
-}
-impl std::fmt::Debug for Instruction {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> { 
-        fmt.write_str(&format!("{:b} {:b} {:b} {:b}", self.opcode(), self.fun3(), self.fun7(), self.0))
-    }
-}
-impl std::fmt::Display for Instruction {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> { 
-        fmt.write_str(&format!("{} {} {} {}", self._opcode_name(), self.destination(), self.s1(), self.s2()))
     }
 }
 
@@ -293,7 +293,7 @@ pub fn parse_r(i: Instruction) -> (Register, Register, Register) {
 
 pub fn empty_fun(rs1:RegisterValue, rs2:RegisterValue) -> RegisterValue {
     dbg!(rs1,rs2);
-    println!("Unsupported function !");
+    dbg!("Unsupported function !");
     0
 }
 

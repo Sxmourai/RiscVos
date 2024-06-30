@@ -1,3 +1,4 @@
+#![allow(unused, dead_code, non_snake_case)]
 mod args;
 mod vm;
 mod cpu;
@@ -20,6 +21,6 @@ fn main() -> Result<()> {
     let args = Cli::parse();
     let program = std::fs::read(args.kernel_file).unwrap();
     assert!(program.len()%2==0);
-    vm::run(program);
+    vm::VM::new(program).run();
     Ok(())
 }
