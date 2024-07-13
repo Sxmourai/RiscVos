@@ -19,7 +19,7 @@ impl VM {
     pub fn get_dword(&self, idx: usize) -> u32 {
         unsafe {*((self.program.as_ptr() as *const u32).offset(idx as isize))}
     }
-    pub fn get_T<T: Copy>(&self, idx: usize) -> T {
+    pub fn get_any<T: Copy>(&self, idx: usize) -> T {
         unsafe {*((self.program.as_ptr() as *const T).offset(idx as isize))}
     }
 }
@@ -267,6 +267,19 @@ impl std::fmt::Debug for Instruction {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> { 
         fmt.write_str(&format!("{} {} {} {}", self._opcode_name(), Self::_reg_to_str(self.rd()), Self::_reg_to_str(self.rs1()), Self::_reg_to_str(self.rs2())))
     }
+}
+
+pub fn disasm(program: Vec<u8>) -> Option<String> {
+    unsafe{OPS.set(get_ops()).unwrap()};
+    let vm = VM::new(program);
+    let mut parsed = String::new();
+    use std::fmt::Write;
+    for i in 0..vm.program.len()/2 {
+        let instruction = Instruction(vm.get_dword(i));
+        if instruction._opcode_name() == "unknown" {break;} // The file currently has some unknown instructions
+        writeln!(parsed, "{:?}",instruction).ok()?;
+    }
+    Some(parsed)
 }
 
 

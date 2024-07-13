@@ -179,6 +179,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b6a852b24ab71dffc585bcb46eaf7959d175cb865a7152e35b348d1b2960422"
 
 [[package]]
+name = "elf"
+version = "0.7.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4445909572dbd556c457c849c4ca58623d84b27c8fff1e74b0b4227d8b90d17b"
+
+[[package]]
 name = "emulator"
 version = "0.1.0"
 dependencies = [
@@ -186,6 +192,7 @@ dependencies = [
  "bitfield",
  "clap",
  "color-eyre",
+ "elf",
 ]
 
 [[package]]

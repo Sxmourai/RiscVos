@@ -1,4 +1,4 @@
 [toolchain]
 channel = "nightly"
 components = []
-targets = ["riscv64gc-unknown-linux-gnu"] # https://doc.rust-lang.org/nightly/rustc/platform-support.html
+targets = ["riscv64gc-unknown-none-elf"] # https://doc.rust-lang.org/nightly/rustc/platform-support.html

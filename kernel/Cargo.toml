@@ -3,9 +3,12 @@ name = "kernel"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+testing = []
+default = []
+
 [dependencies]
-# riscv-rt = "0.12.2"
-# panic-halt = "0.2.0"
+spin = "0.9.8"
 
 [profile.dev]
 panic="abort"
@@ -16,6 +19,10 @@ opt-level = "z"
 
 [profile.release]
 panic="abort"
-opt-level = "s"
-debug = false
+# opt-level = "s"
+# debug = false
 strip = true
+
+[lints.rust]
+# We use "testing" instead of "test" because we have a custom test system, check test.py
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(testing)'] }
