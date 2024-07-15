@@ -17,6 +17,16 @@ macro_rules! dbg {
         }
     };
 }
+#[macro_export]
+macro_rules! dbg_bits {
+    ($val:expr $(, $vals:expr)*) => {
+        {
+            $crate::println!("[{}:{}] {} = {:b}", file!(), line!(), stringify!($val), &$val);
+            // crate::dbg!($($vals),*);
+            $( $crate::dbg!($vals); )*
+        }
+    };
+}
 
 #[macro_export]
 macro_rules! print {

@@ -2,7 +2,7 @@ use core::cell::OnceCell;
 
 use bitfield::bitfield;
 
-use crate::{csrr, csrw, dbg, heap::kalloc};
+use crate::{csrr, csrw, dbg, dbg_bits, heap::kalloc};
 
 // PMP -> Physical memory protection
 // PMP checks are only in Supervised or User mode
@@ -229,11 +229,14 @@ impl PageTableEntry {
         Self((ppn.0 & !(0xFFF)) >> 2)
     }
     pub fn parse_ppn(self) -> Sv39PhysicalAddress {
-        Sv39PhysicalAddress((self.0<<2)&!(0x3FF))// Get only bits 56-10 and shift by 2 to right 
+        Sv39PhysicalAddress((self.0&!(0x3FF))<<2)// Get only bits 56-10 and shift by 2 to right 
     }
     // If Read or Write or Execute bit is set, then it is a leaf, else it's a branch
     pub fn is_leaf(self) -> bool {
         self.0 & 0b1110 != 0
+    }
+    pub fn apply_flags(self, flags: PageTableEntryFlags) -> Self {
+        Self(self.0 | flags.0)
     }
 }
 // Can't derive cuz using bitfield
@@ -241,6 +244,28 @@ impl Clone for PageTableEntry {
     fn clone(&self) -> Self { *self }
 }
 impl Copy for PageTableEntry {}
+
+bitfield! {
+    pub struct PageTableEntryFlags(u64);
+    impl Debug;
+    pub valid, set_valid: 1, 0;
+    pub readable, set_readable: 2, 1;
+    pub writable, set_writable: 3, 2;
+    pub executable, set_executable: 4, 3;
+    pub user_mode_accessible, set_user_mode_accessible: 5, 4;
+    pub global_mapping, set_global_mapping: 6, 5;
+    pub accessed, set_accessed: 7, 6;
+    pub dirty, set_dirty: 8, 7;
+
+    pub rsw, set_rsw: 10, 8;
+
+    pub pbmt, set_pbmt: 62, 60;
+    pub n, set_n: 63, 62;
+}
+impl Clone for PageTableEntryFlags {
+    fn clone(&self) -> Self { *self }
+}
+impl Copy for PageTableEntryFlags {}
 
 bitfield! {
     // Only 56 bits
@@ -252,6 +277,16 @@ bitfield! {
     pub ppn0, set_ppn0: 21, 12;
     pub ppn1, set_ppn1: 30, 21;
     pub ppn2, set_ppn2: 56, 30;
+}
+impl Sv39PhysicalAddress {
+    pub fn new(paddr: u64) -> Self {        
+        let mut _s = Self(0);
+        let frame = paddr/4096;
+        _s.set_ppn0((frame)&0x1FF);
+        _s.set_ppn1((frame>>9)&0x1FF);
+        _s.set_ppn2((frame>>18)&0x3FF_FFFF);
+        _s
+    }
 }
 
 bitfield! {
@@ -266,6 +301,14 @@ bitfield! {
     pub vpn2, set_vpn2: 39, 30;
 }
 impl Sv39VirtualAddress {
+    pub fn new(addr: u64) -> Self {
+        let mut _s = Self(0);
+        let page = addr/4096;
+        _s.set_vpn0((page)&0x1FF);
+        _s.set_vpn1((page>>9)&0x1FF);
+        _s.set_vpn2((page>>18)&0x1FF);
+        _s
+    }
     pub fn vpn(self, vpni: u64) -> u64 {
         assert!(vpni <= 3);
         (self.0 >> (9 * vpni)) & 0x1FF
@@ -292,47 +335,34 @@ impl PageTable {
         }
     }
 }
+
 /// Automatically gets root page table, and page-level
 /// Return: result
 /// # Safety
 /// Ultimate memory breaker, could write to different virtual addresses but be on same physical etc...
-pub unsafe fn map(vaddr: Sv39VirtualAddress, paddr: Sv39PhysicalAddress, flags: PageTableEntry) {
-    assert!(flags.is_leaf());
-    // let vpn = [
-    //     // VPN[2] = vaddr[38:30]
-    //     (vaddr >> 30) & 0x1ff,
-    //     // VPN[1] = vaddr[29:21]
-    //     (vaddr >> 21) & 0x1ff,
-    //     // VPN[0] = vaddr[20:12]
-    //     (vaddr >> 12) & 0x1ff,
-    // ];
-    // let ppn = [
-    //     // PPN[2] = paddr[55:30]
-    //     (paddr >> 30) & 0x3ff_ffff,
-    //     // PPN[1] = paddr[29:21]
-    //     (paddr >> 21) & 0x1ff,
-    //     // PPN[0] = paddr[20:12]
-    //     (paddr >> 12) & 0x1ff,
-    // ];
-    let level = 3; // Manually set level for now
-    let mut current_page_table = unsafe { &mut *(ROOT_PAGE_TABLE.unwrap()) };
-    for i in (0..level) {
-        todo!();
-        // let page = vpn[i];
-        // let frame = ppn[i]; // Probably not right name, but comes from x86 and makes sens
-        // let entry = &mut current_page_table.entries[page];
-        // // If no entry is in table, we have to create one
-        // if entry.valid() == 0 {
-        //     let entry_page = kalloc(1).unwrap();
-
-        // }
+pub unsafe fn map(vaddr: Sv39VirtualAddress, paddr: Sv39PhysicalAddress, flags: PageTableEntryFlags) {
+    assert!(PageTableEntry(flags.0).is_leaf());
+    match get_page(vaddr) {
+        Ok(mut entry) => {*entry = entry.apply_flags(flags);},
+        Err(mut entry) => {
+            dbg!(entry);
+            let mut pte = PageTableEntry(flags.0);
+            pte.set_ppn0(paddr.ppn0());
+            pte.set_ppn1(paddr.ppn1());
+            pte.set_ppn2(paddr.ppn2());
+            *entry = pte;
+        },
     }
 }
 
 static mut ROOT_PAGE_TABLE: Option<*mut PageTable> = None;
 
+
 // This is from 10.3.2. Virtual Address Translation Process
-pub fn virtual_to_physical(va: Sv39VirtualAddress) -> Sv39PhysicalAddress {
+/// Returns
+/// If find the entry and is valid, returns the corresponding PageTableEntry inside Ok()
+/// If entry is invalid, returns a ptr to the entry, inside Err()
+pub fn get_page(va: Sv39VirtualAddress) -> Result<&'static mut PageTableEntry, *mut PageTableEntry> {
     // Step 1.
     let satp = SATP(csrr!("satp"));
     let mut current_pte_addr = satp.ppn() * 4096;
@@ -340,31 +370,41 @@ pub fn virtual_to_physical(va: Sv39VirtualAddress) -> Sv39PhysicalAddress {
     assert!((get_mode() == PrivilegeLevel::Supervisor || get_mode() == PrivilegeLevel::User));
 
     let leaf_pte = loop {
+        dbg!(level, current_pte_addr);
         if level == 0 {
             panic!("Not found ?")
         }
         level -= 1;
         // Step 2.
-        let pte_addr = current_pte_addr + va.vpn(level) * (core::mem::size_of::<Sv39VirtualAddress>() as u64);
+        let pt = unsafe {&mut *(current_pte_addr as *mut PageTable)};
+        let mut pte = &mut pt.entries[(va.vpn(level) * (core::mem::size_of::<Sv39VirtualAddress>() as u64)) as usize];
         // CAUTION! If accessing pte violates a PMA or PMP check, raise an access-fault exception corresponding to the
         // original access type
-        let pte = unsafe { *(pte_addr as *mut PageTableEntry) };
+        // let pte = unsafe { *(pte_addr as *mut PageTableEntry) };
         // Step 3.
         if !pte.is_valid() || (!pte.is_readable() && pte.is_writable()) {
             // || pte.any_reserved_combination
-            panic!("Page fault: trying to load from invalid entry !");
+            // panic!("Page fault: trying to load from invalid entry !");
+            let mut _pte = *pte; // Little cheat =)
+            dbg_bits!(_pte.0);
+            dbg!(pte);
+            return Err(core::ptr::addr_of_mut!(_pte))
         }
         // Step 4.
         if pte.is_leaf() {
             // Step 5.
+            dbg!(pte);
             break pte;
         }
-        current_pte_addr = pte.parse_ppn().0*4096;
+        current_pte_addr = match level {
+            0 => {pte.ppn0()},
+            1 => {pte.ppn1()},
+            2 => {pte.ppn2()},
+            _ => {todo!()},
+        }*4096;
+        // pte.ppn(level).0*4096;
     };
-
-
-    
-    Sv39PhysicalAddress(0)
+    Ok(leaf_pte)
 }
 
 pub fn init() {
@@ -385,37 +425,19 @@ pub fn init() {
     unsafe { *(root_page_table_ptr) = root_page_table };
     unsafe { ROOT_PAGE_TABLE.replace(root_page_table_ptr) };
     satp.set_ppn((root_page_table_ptr as u64) >> 12); // 2^12=4096
-    dbg!(satp, root_page_table_ptr);
+    dbg!(root_page_table_ptr);
     unsafe { csrw!("satp", satp.0) };
-    unsafe { dbg!(csrr!("satp")) };
-    unsafe { core::ptr::write_volatile(0x100 as *mut u8, 10) }
-
+    unsafe { csrr!("satp") };
+    let vaddr = Sv39VirtualAddress::new(crate::traps::save_context as _);
+    let paddr = Sv39PhysicalAddress::new(kalloc(1).unwrap() as u64);
+    let mut flags = PageTableEntryFlags(0b1111); // XWRV
+    unsafe{map(vaddr, paddr, flags)}
+    let pte = get_page(vaddr);
+    crate::dbg!(pte);
+    crate::dbg_bits!(pte.unwrap().0);
     // unsafe{core::arch::asm!("csrw satp, {}", in(reg) satp)};
 }
 
-#[repr(usize)]
-#[derive(Copy, Clone)]
-pub enum EntryBits {
-    None = 0,
-    Valid = 1 << 0,
-    Read = 1 << 1,
-    Write = 1 << 2,
-    Execute = 1 << 3,
-    User = 1 << 4,
-    Global = 1 << 5,
-    Access = 1 << 6,
-    Dirty = 1 << 7,
-
-    // Convenience combinations
-    ReadWrite = 1 << 1 | 1 << 2,
-    ReadExecute = 1 << 1 | 1 << 3,
-    ReadWriteExecute = 1 << 1 | 1 << 2 | 1 << 3,
-
-    // User Convenience Combinations
-    UserReadWrite = 1 << 1 | 1 << 2 | 1 << 4,
-    UserReadExecute = 1 << 1 | 1 << 3 | 1 << 4,
-    UserReadWriteExecute = 1 << 1 | 1 << 2 | 1 << 3 | 1 << 4,
-}
 
 // Sv32:
 
