@@ -10,7 +10,7 @@ pub struct HeapAllocator {
     heap_size: usize,
 }
 impl HeapAllocator {
-    pub fn pages(&self, ) -> HeapPageIterator {
+    pub fn pages(&self, ) -> HeapPageIterator<'_> {
         HeapPageIterator::new(self)
     }
     pub fn alloc(&self, page_count: usize) -> Option<*mut Page> {

@@ -13,7 +13,7 @@ pub mod riscv_utils;
 
 extern crate alloc;
 #[panic_handler]
-fn _panic(_info: &core::panic::PanicInfo) -> ! {
+fn _panic(_info: &core::panic::PanicInfo<'_>) -> ! {
     dbg!(_info);
     loop {}
 }

@@ -22,6 +22,7 @@ macro_rules! dbg {
 macro_rules! print {
     ($($args:tt)+) => ({
         use core::fmt::Write;
+        #[allow(clippy::macro_metavars_in_unsafe)]
         let _ = unsafe{write!($crate::console::STDIO_UART, $($args)+)};
     });
 }

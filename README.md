@@ -28,6 +28,18 @@ python test.py
 ```
 Also if you want to use clippy, you should use it with --no-deps, so that it doesn't check in the tests folder or else it will cause some errors
 
+## Clippy
+
+In kernel directory
+```bash
+python clippy.py
+```
+Every argument you add after will be appended to clippy e.g.:
+```bash
+python clippy.py --allow-dirty
+# Transforms into
+__CARGO_FIX_YOLO=1 cargo clippy --allow-dirty
+```
 
 ## Cool resources
 - https://projectf.io

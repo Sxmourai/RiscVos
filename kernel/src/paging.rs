@@ -78,44 +78,40 @@ bitfield::bitfield! {
     pub struct MSTATUS(u64);
     impl Debug;
 
-    #[allow(non_snake_case)]
-    pub SD,  set_SD: 63, 62;
+    pub sd,  set_sd: 63, 62;
 
     // Controls endianness (User, Machine, Supervisor)
-    #[allow(non_snake_case)]
-    pub UBE,  set_UBE: 7, 6;
-    #[allow(non_snake_case)]
-    pub MBE,  set_MBE: 38, 37;
-    #[allow(non_snake_case)]
-    pub SBE,  set_SBE: 37, 36;
+    pub ube,  set_ube: 7, 6;
+    pub mbe,  set_mbe: 38, 37;
+    pub sbe,  set_sbe: 37, 36;
     // SXL and UXL control value of XLEN for S and U mode
     // The encoding of these fields is the same as the MXL field of misa, shown in
     // Table 9. The effective XLEN in S-mode and U-mode are termed SXLEN and UXLEN, respectively.
     // Not our case but: When MXLEN=32, the SXL and UXL fields do not exist, and SXLEN=32 and UXLEN=32.
     // the set of legal values that the UXL field may assume excludes those that
     // would cause UXLEN > SXLEN (== is fine)
-    pub SXL, set_SXL: 36, 34; // 2 bits !
-    pub UXL, set_UXL: 34, 32; // 2 bits !
+    pub sxl, set_sxl: 36, 34; // 2 bits !
+    pub uxl, set_uxl: 34, 32; // 2 bits !
 
     // Trap SRET
-    pub TSR,  set_TSR: 23, 22;
+    pub tsr,  set_tsr: 23, 22;
     // (Timeout Wait)
-    pub TW,   set_TW: 22, 21;
+    pub tw,   set_tw: 22, 21;
     // Trap Virtual Memory, used for virtualisation
-    pub TVM,  set_TVM: 21, 20;
+    pub tvm,  set_tvm: 21, 20;
     // The MXR (Make eXecutable Readable) bit modifies the privilege with which loads access virtual
     // memory. When MXR=0, only loads from pages marked readable (R=1 in Figure 59) will succeed.
     // When MXR=1, loads from pages marked either readable or executable (R=1 or X=1) will succeed. MXR
     // has no effect when page-based virtual memory is not in effect. MXR is read-only 0 if S-mode is not
     // supported
-    pub MXR,  set_MXR: 20, 19;
+    pub mxr,  set_mxr: 20, 19;
     // permit Supervisor User Memory access bit modifies the privilege with which S-mode loads
     // and stores access virtual memory. When SUM=0, S-mode memory accesses to pages that are
     // accessible by U-mode (U=1 in Figure 59) will fault. When SUM=1, these accesses are permitted. SUM
     // has no effect when page-based virtual memory is not in effect. Note that, while SUM is ordinarily
     // ignored when not executing in S-mode, it is in effect when MPRV=1 and MPP=S. SUM is read-only 0 if
     // S-mode is not supported or if satp.MODE is read-only 0.
-    pub SUM,  set_SUM: 19, 18;
+    pub sum,  set_sum: 19, 18;
     // 3.1.6.3. Memory Privilege in mstatus Register: Modify privilege
     //  When MPRV=0, loads and stores behave as normal, using the translation and
     // protection mechanisms of the current privilege mode. When MPRV=1, load and store memory
@@ -124,22 +120,22 @@ bitfield::bitfield! {
     // MPRV. MPRV is read-only 0 if U-mode is not supported.
     // An MRET or SRET instruction that changes the privilege mode to a mode less privileged than M also
     // sets MPRV=0.
-    pub MPRV, set_MPRV: 18, 17;
+    pub mprv, set_mprv: 18, 17;
     //todo Interesting for speeding up context switches
-    pub XS,   set_XS: 17, 5; // 2 bits !
-    pub FS,   set_FS: 15, 13; // 2 bits !
+    pub xs,   set_xs: 17, 5; // 2 bits !
+    pub fs,   set_fs: 15, 13; // 2 bits !
     //  When a trap is taken from privilege mode y
     // into privilege mode x, xPIE is set to the value of xIE; xIE is set to 0; and xPP is set to y
-    pub MPP,  set_MPP: 13, 11; // 2 bits !, holds previous privilege mode for machine traps
+    pub mpp,  set_mpp: 13, 11; // 2 bits !, holds previous privilege mode for machine traps
     // M-mode software can determine whether a privilege mode is implemented by writing that
     // mode to MPP then reading it back.
 
-    pub VS,   set_VS: 11, 9; // 2 bits !
-    pub SPP,  set_SPP: 9, 8; // holds previous privilege mode for supervisor traps (cuz it can only be User, only 1 bit)
-    pub MPIE, set_MPIE: 8, 7;
-    pub SPIE, set_SPIE: 6, 5;
-    pub MIE,  set_MIE: 4, 3; // Global interrupt-enable bits supervisor mode
-    pub SIE,  set_SIE: 2, 1; // Global interrupt-enable bits machine mode
+    pub vs,   set_vs: 11, 9; // 2 bits !
+    pub spp,  set_spp: 9, 8; // holds previous privilege mode for supervisor traps (cuz it can only be User, only 1 bit)
+    pub mpie, set_mpie: 8, 7;
+    pub spie, set_spie: 6, 5;
+    pub mie,  set_mie: 4, 3; // Global interrupt-enable bits supervisor mode
+    pub sie,  set_sie: 2, 1; // Global interrupt-enable bits machine mode
 }
 
 // pub static mut PageTables
@@ -150,6 +146,8 @@ pub enum PrivilegeLevel {
     Reserved = 2,   // Abbr:
     Machine = 3,    // Abbr: M
 }
+/// # Safety
+/// Can break memory in a different ways, e.g. switching Machine mode with no paging and Supervisor mode
 pub unsafe fn enter_mode(priv_level: PrivilegeLevel) {
     let mstatus = csrr!("mstatus");
     csrw!(
@@ -158,7 +156,7 @@ pub unsafe fn enter_mode(priv_level: PrivilegeLevel) {
     )
 }
 pub fn get_mode() -> PrivilegeLevel {
-    match MSTATUS(csrr!("mstatus")).MPP() {
+    match MSTATUS(csrr!("mstatus")).mpp() {
         0 => PrivilegeLevel::User,
         1 => PrivilegeLevel::Supervisor,
         3 => PrivilegeLevel::Machine,
@@ -240,9 +238,7 @@ impl PageTableEntry {
 }
 // Can't derive cuz using bitfield
 impl Clone for PageTableEntry {
-    fn clone(&self) -> Self {
-        Self(self.0)
-    }
+    fn clone(&self) -> Self { *self }
 }
 impl Copy for PageTableEntry {}
 
@@ -276,9 +272,7 @@ impl Sv39VirtualAddress {
     }
 }
 impl Clone for Sv39VirtualAddress {
-    fn clone(&self) -> Self {
-        Self(self.0)
-    }
+    fn clone(&self) -> Self { *self }
 }
 impl Copy for Sv39VirtualAddress {}
 
@@ -298,8 +292,10 @@ impl PageTable {
         }
     }
 }
-// Will return result
-// Automatically gets root page table, and page-level
+/// Automatically gets root page table, and page-level
+/// Return: result
+/// # Safety
+/// Ultimate memory breaker, could write to different virtual addresses but be on same physical etc...
 pub unsafe fn map(vaddr: Sv39VirtualAddress, paddr: Sv39PhysicalAddress, flags: PageTableEntry) {
     assert!(flags.is_leaf());
     // let vpn = [

@@ -2,8 +2,8 @@ pub struct UART {
     base_port: *mut u8,
 }
 impl UART {
-    // ## Safety:
-    // Caller must ensure the `init` method is called next
+    /// # Safety
+    /// Caller must ensure the `init` method is called next
     pub const unsafe fn new(port: u64) -> Self {
         
         Self {
