@@ -5,5 +5,9 @@ pub mod tests;
 pub mod uart;
 pub mod console;
 pub mod heap;
+pub mod paging;
+pub mod traps;
+pub mod plic;
+pub mod riscv_utils;
 
 extern crate alloc;

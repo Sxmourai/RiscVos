@@ -20,7 +20,7 @@ for test in os.listdir("tests"):
                 fname = line.strip().lstrip("pub ").lstrip("const ").lstrip("fn ")
                 fname = fname[:fname.index("(")].strip()
                 fnames.append(fname)
-        raw += raw_content
+        raw += raw_content.replace("kernel::", "crate::") # We use kernel because rust-analyzer can find the library, or else he doesn't find anything and the test development process is longer
 
 with open("target/compiled_tests.rs", "w") as f:
     f.write(raw)
@@ -28,7 +28,7 @@ with open("target/compiled_tests.rs", "w") as f:
     f.write(f"""
 pub fn test_all() {{
     {function_calls}
-    crate::print!("FLAG_EO_TESTS");
+    close_qemu();
 }}
 """)
     
@@ -40,12 +40,13 @@ KERNEL_FILE="/".join((TARGET_DIR,PROFILE_PATH,"kernel"))
 import subprocess
 cmd = subprocess.Popen(f"qemu-system-riscv64 -machine virt -smp {args.cpu_count} -m {args.mem_size} -nographic -serial mon:stdio -bios none -kernel {KERNEL_FILE} {args.qemu_args}".split(" "), stdout=subprocess.PIPE, stdin=subprocess.PIPE)
 read = bytes(0)
-while True:
-    read += cmd.stdout.read(1)
-    if read.decode(errors="ignore").strip().endswith("FLAG_EO_TESTS"):
-        print("\r", end="") # Erase last FLAG_EO_TESTS print
-        cmd.kill()
-        break
-    else:
-        print(read[-1:].decode(errors="ignore"), end="")
-        
+try:
+    while True:
+        read += cmd.stdout.read(1)
+        if read.decode(errors="ignore").strip().endswith("FLAG_EO_TESTS"):
+            print("\r", end="") # Erase last FLAG_EO_TESTS print
+            cmd.kill()
+            break
+        else:
+            print(read[-1:].decode(errors="ignore"), end="")
+except KeyboardInterrupt:pass

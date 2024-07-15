@@ -17,4 +17,19 @@ KERNEL_FILE="/".join((TARGET_DIR,PROFILE_PATH,"kernel"))
 # When we will be able to read from disk
 # DRIVE=fat32.raw
 # And append to QEMU: -drive if=none,format=raw,file=$(DRIVE),id=fat_disk -device virtio-blk-device,scsi=off,drive=fat_disk
-cmd(f"qemu-system-riscv64 -machine virt -smp {args.cpu_count} -m {args.mem_size} -nographic -serial mon:stdio -bios none -kernel {KERNEL_FILE} {args.qemu_args}")
+import subprocess
+cmd = subprocess.Popen(f"qemu-system-riscv64 -machine virt -smp {args.cpu_count} -m {args.mem_size} -nographic -serial mon:stdio -bios none -kernel {KERNEL_FILE} {args.qemu_args}".split(" "), stdout=subprocess.PIPE)
+read = bytes(0)
+try:
+    while True:
+        read += cmd.stdout.read(1)
+        decoded_read = read.decode(errors="ignore").strip()
+        print(read[-1:].decode(errors="ignore"), end="")
+        if decoded_read.endswith("FLAG_EO_TESTS"):# or decoded_read.endswith("QEMU: Terminated"):
+            print("\r             ", end="") # Erase last FLAG_EO_TESTS print
+            cmd.kill()
+            break
+        # else:
+except KeyboardInterrupt:
+    pass
+print()

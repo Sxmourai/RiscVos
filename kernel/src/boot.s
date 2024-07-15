@@ -23,6 +23,7 @@ _start:
 # We need to ensure they are all set to 0
     la a0, _bss_start # Load address bss_start
     la a1, _bss_end
+    # Should never happend (_bss_start>bss_end)
     bgeu a0, a1, 2f # if a0 >= a1 {{ goto 2 }} 
 1:
     sd zero, (a0) # Store double-word (8 bytes / 64bit) 0 at address in a0
@@ -31,15 +32,13 @@ _start:
 2:  
     # Preparing Rust enter =)
     la sp, _stack_end # Load stack ptr, grows downwards, so we want a bit of space
-    li		t0, (0b11 << 11) | (1 << 7) | (1 << 3)
-    csrw	mstatus, t0 # Write the flags (in respective order: machine mode, some interrupts)
     # Machine mode will give us access to all of the instructions and registers, we should already be in this state, but we don't know
-    la		t1, kmain # Load address of our main function (see src/main.rs)
-    csrw	mepc, t1 # Set Machine Exception Program Counter
-    la		t2, asm_trap_vector # See src/trap.s
-    csrw	mtvec, t2 # Set Machine Trap Vector (called if trap, such as syscall, illegal instruction, or even a timer interrupt)
+    li		t0, (0b11 << 11) | (1 << 7) | (1 << 3) # | (1 << 5)
+    csrw	mstatus, t0 # Write the flags (in respective order: machine mode, some interrupts)
     li		t3, (1 << 3) | (1 << 7) | (1 << 11)
     csrw	mie, t3 # Set flags of Machine Interrupt Enable (in order: )
+    la		t1, kmain # Load address of our main function (see src/main.rs)
+    csrw	mepc, t1 # Set Machine Exception Program Counter
     la		ra, 3f
     # We use mret here so that the mstatus register is properly updated.
     mret
@@ -47,10 +46,3 @@ _start:
 3:
     wfi
     j   3b
-
-
-.section .text
-.global asm_trap_vector
-asm_trap_vector:
-    # We get here when the CPU is interrupted for any reason.
-    mret

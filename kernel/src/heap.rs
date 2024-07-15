@@ -97,7 +97,13 @@ pub fn init() {
     // Idk why, it should be the value, but the value is 0 and the address is the value...
     let heap_start = unsafe{core::ptr::addr_of!(_heap_start) as usize};
     let heap_size = unsafe{core::ptr::addr_of!(_heap_size) as usize};
-    unsafe{MAIN_HEAP_ALLOCATOR.heap_start = heap_start};
+    unsafe{MAIN_HEAP_ALLOCATOR.heap_start = heap_start-(heap_start%4096)+4096};
     unsafe{MAIN_HEAP_ALLOCATOR.heap_size = heap_size};
     // We now have Vecs & others ! 
+}
+
+pub fn kalloc(page_count: usize) -> Option<*mut Page> {
+    unsafe {
+        MAIN_HEAP_ALLOCATOR.alloc(page_count)
+    }
 }

@@ -1,13 +1,25 @@
 #![no_std]
 #![no_main]
 
-use kernel::{print, println};
+use kernel::{csrr, dbg, print, println};
 
 core::arch::global_asm!(include_str!("boot.s"));
+unsafe fn assert_mstatus() {
+    let mstatus = csrr!("mstatus");
+    unsafe { kernel::paging::enter_mode(kernel::paging::PrivilegeLevel::Machine) }
+    if mstatus != csrr!("mstatus") {
+        dbg!(mstatus, csrr!("mstatus"));
+    }
+} 
+
 #[no_mangle]
 extern "C" fn kmain() {
     unsafe{kernel::console::STDIO_UART.init()};
+    unsafe {assert_mstatus()};
     kernel::heap::init();
+    kernel::traps::init();
+    kernel::paging::init();
+    kernel::plic::init();
     println!("Booting: Risc-V os v0.0.0 ...");
     #[cfg(feature = "testing")]
     kernel::tests::test_all();
@@ -21,14 +33,14 @@ extern "C" fn kmain() {
                 10 | 13 => {
                     println!();
                 },
+                3 => {// From what i've seen it's CTRL+C
+                    kernel::tests::close_qemu()
+                },
                 _ => {
-                    // print!("{}", input_char);
+                    print!("{}", input_char);
+                    print!("{}", input_char);
                     unsafe{kernel::console::STDIO_UART.write_chr(input_char)};
             }
-            }
-            if input_char == 127 { 
-                unsafe{kernel::console::STDIO_UART.write_chr(b'b')};
-            }  else {
             }
         }
         // wfi()

@@ -7,5 +7,9 @@ fn decorate_test(fname: &'static str, f: fn() -> bool) {
     }
 }
 
+pub fn close_qemu() {
+    crate::print!("FLAG_EO_TESTS"); // Interpreted in run.py and test.py to close qemu
+}
+
 #[cfg(feature="testing")]
 include!("../target/compiled_tests.rs");
