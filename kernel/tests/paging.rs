@@ -1,3 +1,7 @@
+#![no_std]
+#![feature(custom_inner_attributes)]
+#![clippy::allow(all)]
+
 pub fn manipulations() -> bool {
     let mut pte = kernel::paging::PageTableEntry(0);
     pte.set_ppn0(0x8000013/4096);

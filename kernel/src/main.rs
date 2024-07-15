@@ -1,6 +1,9 @@
 #![no_std]
 #![no_main]
 
+#[cfg(not(target_arch="riscv64"))]
+compile_error!("Target arch should be riscv 64 !");
+
 use kernel::{csrr, dbg, print, println};
 
 core::arch::global_asm!(include_str!("boot.s"));
@@ -40,7 +43,7 @@ extern "C" fn kmain() {
                     print!("{}", input_char);
                     print!("{}", input_char);
                     unsafe{kernel::console::STDIO_UART.write_chr(input_char)};
-            }
+                }
             }
         }
         // wfi()
@@ -49,7 +52,7 @@ extern "C" fn kmain() {
     // spin_loop()
 }
 
-// Could be unsafe ? Because it could stop os if no interrupts ?
+// Should be unsafe, because it could stop os if no interrupts ?
 fn wfi() {
     unsafe {
         core::arch::asm!("wfi"); // "hlt" in x86
@@ -64,21 +67,4 @@ pub fn spin_loop() -> ! {
 #[no_mangle]
 pub extern "C" fn abort() -> ! {
 	spin_loop()
-}
-
-#[panic_handler]
-fn panic(info: &core::panic::PanicInfo) -> ! {
-	print!("Aborting: ");
-	if let Some(p) = info.location() {
-		println!(
-					"file {}:{} - {}",
-					p.file(),
-					p.line(),
-					info.message()
-		);
-	}
-	else {
-		println!("no information available.");
-	}
-    spin_loop()
 }

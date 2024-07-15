@@ -66,7 +66,7 @@ unsafe extern "C" fn trap_vector() {
 
     // We can write at address 0x100, just after VIRT_DEBUG in QEMU and before VIRT_MROM
     // println!("{:b}", csrr!("mtval", u64));
-    // for i in 0..1472762 {}
+    for i in 0..1472762 {}
     // save_context(0x100);
     // Is interrupt is like is asynchronous
     // (cpu exceptions are considered to be synchronous, because they raise with the current instruction, )

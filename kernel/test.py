@@ -10,17 +10,24 @@ parser.add_argument("--qemu-args", default="")
 args = parser.parse_args()
 PROFILE_PATH = args.profile
 if PROFILE_PATH == "dev":PROFILE_PATH = "debug"
+TEST_DIR = "tests"
 raw = ""
-for test in os.listdir("tests"):
-    with open("tests/"+test, "r") as f:
+
+for test in os.listdir(TEST_DIR):
+    with open(f"{TEST_DIR}/{test}", "r") as f:
         raw_content = f.read()
         fnames = []
-        for line in raw_content.splitlines():
+        lines = ""
+        for line in raw_content.splitlines(keepends=True):
+            if line.startswith("#!"):continue
             if "fn" in line:
                 fname = line.strip().lstrip("pub ").lstrip("const ").lstrip("fn ")
                 fname = fname[:fname.index("(")].strip()
                 fnames.append(fname)
-        raw += raw_content.replace("kernel::", "crate::") # We use kernel because rust-analyzer can find the library, or else he doesn't find anything and the test development process is longer
+
+            line = line.replace("kernel::", "crate::") # We use kernel because rust-analyzer can find the library, or else he doesn't find anything and the test development process is longer
+            lines += line
+        raw += lines
 
 with open("target/compiled_tests.rs", "w") as f:
     f.write(raw)
