@@ -7,6 +7,7 @@ parser.add_argument("--cpu-count", default="4")
 parser.add_argument("--mem-size", default="128M")
 parser.add_argument("--build-args", default="")
 parser.add_argument("--qemu-args", default="")
+parser.add_argument("--tests", default="all")
 args = parser.parse_args()
 PROFILE_PATH = args.profile
 if PROFILE_PATH == "dev":PROFILE_PATH = "debug"
@@ -28,6 +29,10 @@ for test in os.listdir(TEST_DIR):
             line = line.replace("kernel::", "crate::") # We use kernel because rust-analyzer can find the library, or else he doesn't find anything and the test development process is longer
             lines += line
         raw += lines
+
+if args.tests != "all":
+    tests = args.tests.split(",")
+    fnames = filter(lambda fn: fn in tests, fnames)
 
 with open("target/compiled_tests.rs", "w") as f:
     f.write(raw)

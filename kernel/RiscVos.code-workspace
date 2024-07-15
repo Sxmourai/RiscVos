@@ -1,0 +1,18 @@
+{
+	"folders": [
+		{
+			"name": "RiscVos",
+			"path": ".."
+		},
+		{
+			"name": "emulator",
+			"path": "../emulator"
+		}
+	],
+	"settings": {
+		"rust-analyzer.cargo.allTargets": false,
+		"rust-analyzer.cargo.target": "riscv64gc-unknown-none-elf",
+		"rust-analyzer.checkOnSave.allTargets": false,
+		// "rust-analyzer.check.targets": ["riscv64gc-unknown-none-elf",],
+	}
+}

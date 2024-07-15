@@ -1,25 +1,16 @@
 #![no_std]
 #![no_main]
 
-#[cfg(not(target_arch="riscv64"))]
-compile_error!("Target arch should be riscv 64 !");
-
-use kernel::{csrr, dbg, print, println};
-
+use kernel::*;
 core::arch::global_asm!(include_str!("boot.s"));
-unsafe fn assert_mstatus() {
-    let mstatus = csrr!("mstatus");
-    unsafe { kernel::paging::enter_mode(kernel::paging::PrivilegeLevel::Machine) }
-    if mstatus != csrr!("mstatus") {
-        dbg!(mstatus, csrr!("mstatus"));
-    }
-} 
 
 #[no_mangle]
 extern "C" fn kmain() {
     unsafe{kernel::console::STDIO_UART.init()};
     unsafe {assert_mstatus()};
     kernel::heap::init();
+    #[cfg(feature = "testing")]
+    kernel::tests::test_all();
     kernel::traps::init();
     kernel::paging::init();
     kernel::plic::init();
@@ -50,21 +41,4 @@ extern "C" fn kmain() {
         // core::hint::spin_loop()
     }
     // spin_loop()
-}
-
-// Should be unsafe, because it could stop os if no interrupts ?
-fn wfi() {
-    unsafe {
-        core::arch::asm!("wfi"); // "hlt" in x86
-    }
-}
-
-pub fn spin_loop() -> ! {
-    loop {wfi()}
-}
-
-// https://github.com/sgmarz/osblog/blob/master/risc_v/src/main.rs
-#[no_mangle]
-pub extern "C" fn abort() -> ! {
-	spin_loop()
 }
