@@ -15,10 +15,18 @@ I followed https://osblog.stephenmarz.com/ to get things started
 ## Running
 
 To launch the kernel (make sure you have qemu and preferably on linux), run:
-
+In kernel directory
 ```bash
-python main.py kernel
+python run.py
 ```
+
+## Testing
+
+In kernel directory
+```bash
+python test.py
+```
+Also if you want to use clippy, you should use it with --no-deps, so that it doesn't check in the tests folder or else it will cause some errors
 
 
 ## Cool resources

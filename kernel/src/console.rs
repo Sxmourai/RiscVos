@@ -7,13 +7,13 @@ pub static mut STDIO_UART: UART = unsafe {UART::new(0x1000_0000)};
 #[macro_export]
 macro_rules! dbg {
     () => {
-        crate::println!("[{}:{}] ", file!(), line!());
+        $crate::println!("[{}:{}] ", file!(), line!());
     };
     ($val:expr $(, $vals:expr)*) => {
         {
-            crate::println!("[{}:{}] {} = {:?}", file!(), line!(), stringify!($val), &$val);
+            $crate::println!("[{}:{}] {} = {:?}", file!(), line!(), stringify!($val), &$val);
             // crate::dbg!($($vals),*);
-            $( crate::dbg!($vals); )*
+            $( $crate::dbg!($vals); )*
         }
     };
 }

@@ -13,6 +13,12 @@ pub static mut MEMORY_PROTECTION: OnceCell<PMP> = OnceCell::new();
 pub struct PMP {
     page_tables: [Table; 512],
 }
+impl Default for PMP {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PMP {
     pub fn new() -> Self {
         Self {
@@ -22,6 +28,12 @@ impl PMP {
 }
 #[derive(Clone)]
 pub struct Table {}
+impl Default for Table {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Table {
     pub fn new() -> Self {
         Self {}
@@ -229,7 +241,7 @@ impl PageTableEntry {
 // Can't derive cuz using bitfield
 impl Clone for PageTableEntry {
     fn clone(&self) -> Self {
-        Self(self.0.clone())
+        Self(self.0)
     }
 }
 impl Copy for PageTableEntry {}
@@ -265,7 +277,7 @@ impl Sv39VirtualAddress {
 }
 impl Clone for Sv39VirtualAddress {
     fn clone(&self) -> Self {
-        Self(self.0.clone())
+        Self(self.0)
     }
 }
 impl Copy for Sv39VirtualAddress {}
@@ -273,6 +285,12 @@ impl Copy for Sv39VirtualAddress {}
 pub struct PageTable {
     pub entries: [PageTableEntry; 512],
 }
+impl Default for PageTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PageTable {
     pub fn new() -> Self {
         Self {
@@ -349,8 +367,8 @@ pub fn virtual_to_physical(va: Sv39VirtualAddress) -> Sv39PhysicalAddress {
     };
 
 
-    let mut pa = Sv39PhysicalAddress(0);
-    pa
+    
+    Sv39PhysicalAddress(0)
 }
 
 pub fn init() {

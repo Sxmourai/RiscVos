@@ -5,10 +5,10 @@ impl UART {
     // ## Safety:
     // Caller must ensure the `init` method is called next
     pub const unsafe fn new(port: u64) -> Self {
-        let _self = Self {
+        
+        Self {
             base_port: port as _,
-        };
-        _self
+        }
     }
     pub fn init(&mut self) {
         let port = self.base_port;
