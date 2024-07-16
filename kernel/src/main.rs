@@ -4,16 +4,21 @@
 use kernel::*;
 core::arch::global_asm!(include_str!("boot.s"));
 
-#[no_mangle]
-extern "C" fn kmain() {
+#[no_mangle] // Machine mode
+extern "C" fn kinit() {
     unsafe{kernel::console::STDIO_UART.init()};
     unsafe {assert_mstatus()};
     kernel::heap::init();
     #[cfg(feature = "testing")]
     kernel::tests::test_all();
-    kernel::traps::init();
-    kernel::paging::init();
-    kernel::plic::init();
+    kernel::traps::init(traps::point as u64);
+}
+
+#[no_mangle]// Supervisor mode
+extern "C" fn kmain() {
+    // println!("Supervisor m");
+    // kernel::paging::init();
+    // kernel::plic::init();
     println!("Booting: Risc-V os v0.0.0 ...");
     #[cfg(feature = "testing")]
     kernel::tests::test_all();
@@ -31,13 +36,11 @@ extern "C" fn kmain() {
                     kernel::tests::close_qemu()
                 },
                 _ => {
-                    print!("{}", input_char);
-                    print!("{}", input_char);
-                    unsafe{kernel::console::STDIO_UART.write_chr(input_char)};
+                    print!("{}", input_char as char);
                 }
             }
         }
-        // wfi()
+        wfi()
         // core::hint::spin_loop()
     }
     // spin_loop()

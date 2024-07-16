@@ -18,6 +18,12 @@ macro_rules! dbg {
     };
 }
 #[macro_export]
+macro_rules! dbg_bits_reg {
+    ($reg: expr) => {{
+        crate::println!("{}: {:b}", stringify!($reg), crate::csrr!($reg));
+    }};
+}
+#[macro_export]
 macro_rules! dbg_bits {
     ($val:expr $(, $vals:expr)*) => {
         {
@@ -48,4 +54,13 @@ macro_rules! println {
     ($fmt:expr, $($args:tt)+) => ({
         $crate::print!(concat!($fmt, "\r\n"), $($args)+)
     });
+}
+
+
+pub fn debug_symbols() {
+    for i in 0..u8::MAX {
+        print!("{}:", i);
+        unsafe{crate::console::STDIO_UART.write_chr(i)};
+        println!("!{}", i);
+    }
 }

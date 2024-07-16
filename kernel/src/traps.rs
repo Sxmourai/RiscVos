@@ -18,7 +18,7 @@ pub struct TrapFrame {
 }
 
 extern "C" fn _trap_vector() {
-    
+    todo!()
 }
 
 
@@ -94,17 +94,57 @@ pub enum Exceptions {
 
 
 #[no_mangle]
-unsafe extern "C" fn trap_vector(epc: usize,
-    tval: usize,
-    cause: usize,
-    hart: usize,
-    status: usize,
-    frame: &mut TrapFrame) -> usize {
+extern "C" fn mtrap() {
+    println!("Machine");
     let cause = csrr!("mcause", u64);
     let is_interrupt = cause & 1u64<<63 != 0;
     let id = cause & 0xFF;
-    crate::print!("Trap: {}\t", id);
+    crate::println!("Trap: {}\t", id);
     let mtval = csrr!("mtval", u64);
+    // dbg!(mtval);
+    if is_interrupt {
+        match id {
+            1 => {println!("Supervisor software interrupt")},
+            3 => {println!("Machine software interrupt")},
+            5 => {println!("Supervisor timer interrupt")},
+            7 => {println!("Machine timer interrupt")},
+            9 => {println!("Supervisor external interrupt")},
+            11 => {println!("Machine external interrupt")},
+            13 => {println!("Counter overflow interrupt")},
+            ..16 => {println!("Custom interrupt !")},
+            _ => {println!("Interrupt cause: {:b}", id);},
+        }
+    } else {
+        match id {
+            0 => {println!("Instruction address misaligned: {}", mtval)},
+            1 => {println!("Instruction access fault: {}", mtval)},
+            2 => {println!("Illegal instruction: {}", csrr!("mepc"))},
+            3 => {println!("Breakpoint: {}", mtval)},
+            4 => {println!("Load address misaligned: {}", mtval)},
+            5 => {println!("Load access fault: {}", mtval)},
+            6 => {println!("Store/AMO address misaligned: {}", mtval)},
+            7 => {println!("Store/AMO access fault: {}", mtval)},
+            8 => {println!("Environment call from U-mode: {}", mtval)},
+            9 => {println!("Environment call from S-mode: {}", mtval)},
+            11 => {println!("Environment call from M-mode: {}", mtval)},
+            12 => {println!("Instruction page fault: {}", mtval)},
+            13 => {println!("Load page fault: {}", mtval)},
+            15 => {println!("Store/AMO page fault: {}", mtval)},
+            18 => {println!("Software check: {}", mtval)},
+            19 => {println!("Hardware error: {}", mtval)},
+            _ => {dbg!(cause, mtval);},
+        }
+    }
+    for i in 0..1472762 {}
+}
+
+#[no_mangle]
+extern "C" fn strap() {
+    let cause = csrr!("scause", u64);
+    let is_interrupt = cause & 1u64<<63 != 0;
+    let id = cause & 0xFF;
+    crate::print!("Trap: {}\t", id);
+    let mtval = csrr!("stval", u64);
     dbg!(mtval);
     if is_interrupt {
         match id {
@@ -139,141 +179,170 @@ unsafe extern "C" fn trap_vector(epc: usize,
             _ => {dbg!(cause, mtval);},
         }
     }
-    for i in 0..1472762 {}
-    epc
 }
 
 extern "C" {
-    fn asm_trap_vector() -> ();
+    pub fn s_trap_vector() -> ();
+    pub fn m_trap_vector() -> ();
 }
 #[no_mangle]
 pub extern "C" fn abort() {
     dbg!(csrr!("mcause"), csrr!("mtval"), csrr!("mscratch"));
     dbg!(csrr!("mepc"), csrr!("mtvec"));
+    let mut res: u64;
+    unsafe{core::arch::asm!("mv {}, t5", out(reg) res)};
+    dbg!(res);
+    unsafe{core::arch::asm!("mv {}, sp", out(reg) res)};
+    dbg!(res);
     println!("Aborting...");
     // loop {}
 } 
+#[no_mangle]
+pub extern "C" fn point() {
+    unsafe {core::ptr::write_volatile(0x1000_0000 as *mut u8, b'.')}
+}
 
-core::arch::global_asm!("
+core::arch::global_asm!(" # Thx core-os
 .option norvc
-.altmacro
-.set NUM_GP_REGS, 32  # Number of registers per context
-.set NUM_FP_REGS, 32
-.set REG_SIZE, 8   # Register size (in bytes)
-.set MAX_CPUS, 8   # Maximum number of CPUs
 
-# Use macros for saving and restoring multiple registers
-.macro save_gp i, basereg=t6
-	sd	x\\i, ((\\i)*REG_SIZE)(\\basereg)
-.endm
-.macro load_gp i, basereg=t6
-	ld	x\\i, ((\\i)*REG_SIZE)(\\basereg)
-.endm
-.macro save_fp i, basereg=t6
-	fsd	f\\i, ((NUM_GP_REGS+(\\i))*REG_SIZE)(\\basereg)
-.endm
-.macro load_fp i, basereg=t6
-	fld	f\\i, ((NUM_GP_REGS+(\\i))*REG_SIZE)(\\basereg)
-.endm
+.align 4
+.global s_trap_vector
+.global m_trap_vector
+store:
+// Space for registers
+addi sp, sp, -256
 
-.global asm_trap_vector
-asm_trap_vector:
-# All registers are volatile here, we need to save them
-# before we do anything.
-csrrw	t6, mscratch, t6
-# csrrw will atomically swap t6 into mscratch and the old
-# value of mscratch into t6. This is nice because we just
-# switched values and didn't destroy anything -- all atomically!
-# in cpu.rs we have a structure of:
-#  32 gp regs		0
-#  32 fp regs		256
-#  SATP register	512
-#  Trap stack       520
-#  CPU HARTID		528
-# We use t6 as the temporary register because it is the very
-# bottom register (x31)
-.set 	i, 1
-.rept	30
-	save_gp	%i
-	.set	i, i+1
-.endr
+sd ra, 0(sp)
+sd sp, 8(sp)
+sd gp, 16(sp)
+sd tp, 24(sp)
+sd t0, 32(sp)
+sd t1, 40(sp)
+sd t2, 48(sp)
+sd s0, 56(sp)
+sd s1, 64(sp)
+sd a0, 72(sp)
+sd a1, 80(sp)
+sd a2, 88(sp)
+sd a3, 96(sp)
+sd a4, 104(sp)
+sd a5, 112(sp)
+sd a6, 120(sp)
+sd a7, 128(sp)
+sd s2, 136(sp)
+sd s3, 144(sp)
+sd s4, 152(sp)
+sd s5, 160(sp)
+sd s6, 168(sp)
+sd s7, 176(sp)
+sd s8, 184(sp)
+sd s9, 192(sp)
+sd s10,200(sp)
+sd s11,208(sp)
+sd t3, 216(sp)
+sd t4, 224(sp)
+sd t5, 232(sp)
+sd t6, 240(sp)
+ret
 
-# Save the actual t6 register, which we swapped into
-# mscratch
-mv		t5, t6
-csrr	t6, mscratch
-save_gp 31, t5
+load:
+ld ra, 0(sp)
+ld sp, 8(sp)
+ld gp, 16(sp)
+// tp
+ld t0, 32(sp)
+ld t1, 40(sp)
+ld t2, 48(sp)
+ld s0, 56(sp)
+ld s1, 64(sp)
+ld a0, 72(sp)
+ld a1, 80(sp)
+ld a2, 88(sp)
+ld a3, 96(sp)
+ld a4, 104(sp)
+ld a5, 112(sp)
+ld a6, 120(sp)
+ld a7, 128(sp)
+ld s2, 136(sp)
+ld s3, 144(sp)
+ld s4, 152(sp)
+ld s5, 160(sp)
+ld s6, 168(sp)
+ld s7, 176(sp)
+ld s8, 184(sp)
+ld s9, 192(sp)
+ld s10, 200(sp)
+ld s11, 208(sp)
+ld t3, 216(sp)
+ld t4, 224(sp)
+ld t5, 232(sp)
+ld t6, 240(sp)
 
-# Restore the kernel trap frame into mscratch
-csrw	mscratch, t5
-#!-----------------------------------------------
-call abort
+addi sp, sp, 256
+ret
 
-# Get ready to go into Rust (trap.rs)
-# We don't want to write into the user's stack or whomever
-# messed with us here.
-csrr	a0, mepc
-csrr	a1, mtval
-csrr	a2, mcause
-csrr	a3, mhartid
-csrr	a4, mstatus
-mv		a5, t5
-ld		sp, 520(a5)
-call	trap_vector
+s_trap_vector:
+call store
+call	strap
+call load
 
-# When we get here, we've returned from m_trap, restore registers
-# and return.
-# m_trap will return the return address via a0.
-
-csrw	mepc, a0
-
-# Now load the trap frame back into t6
-csrr	t6, mscratch
-
-# Restore all GP registers
-.set	i, 1
-.rept	31
-	load_gp %i
-	.set	i, i+1
-.endr
-
-# Since we ran this loop 31 times starting with i = 1,
-# the last one loaded t6 back to its original value.
-
-mret");
+sret
 
 
-pub fn init() {
-    println!("Initialising traps...");
-    let trap_vector_ptr = asm_trap_vector as u64 & !(0b11);
+.align 4
+m_trap_vector:
+call store
+call mtrap
+call load
+mret
+");
+
+
+pub fn init(callback: u64) {
+    println!("\x1b[0;32mInitialising\x1b[0m traps...");
+    // PMP seems cool too
     let mut supervisor_mstatus = MSTATUS(0);
-    supervisor_mstatus.set_mpp(PrivilegeLevel::Supervisor as u64);
     supervisor_mstatus.set_mpie(true); // I think mpie should be set anyway, because we can't have spie and not mpie (see ISA / doc)
     supervisor_mstatus.set_spie(true);
-    supervisor_mstatus.set_mie(true);
-    supervisor_mstatus.set_sie(true);
-    let trap_frame_addr = kalloc(1).unwrap() as u64;
-    let interrupts_enable = (1<<Interrupts::SupervisorTimerInterrupt as u64) | (1<<Interrupts::SupervisorSoftwareInterrupt as u64) | (1<<Interrupts::SupervisorExternalInterrupt as u64);
+    // dbg_bits!(supervisor_mstatus.0);
+    // supervisor_mstatus.set_mie(true);
+    // supervisor_mstatus.set_sie(true);
     unsafe{
-        csrw!("mstatus", supervisor_mstatus.0);
-        csrw!("mscratch", trap_frame_addr);
-        csrw!("mtvec", trap_vector_ptr);
-        csrw!("mie", interrupts_enable);
+        csrw!("mstatus", 1<<11 | 1<<7 | 1<<5);
+        dbg_bits_reg!("mstatus");
+        csrw!("satp", 0);
+        // Delegate all interrupts to supervisor mode (so that we only have 1 interrupt handler)
+        csrw!("medeleg", 0xffff);
+        csrw!("mideleg", 0xffff);
+        dbg!(m_trap_vector as u64);
+        csrw!("mtvec", m_trap_vector as u64 & !(0b11));
+        // let trap_frame_addr = unsafe{&mut *(kalloc(1).unwrap() as *mut TrapFrame)};
+        // dbg!(core::ptr::addr_of!(trap_frame_addr));
+        // dbg!();
+        // unsafe{*trap_frame_addr.trap_stack = kalloc(1).unwrap() as _};
+        // csrw!("mscratch", (core::ptr::addr_of!(trap_frame_addr)) as u64);
+        csrw!("mie", (1<<Interrupts::SupervisorTimerInterrupt as u64) | (1<<Interrupts::SupervisorSoftwareInterrupt as u64) | (1<<Interrupts::SupervisorExternalInterrupt as u64));
+        unsafe{csrw!("stvec", s_trap_vector as u64 & !(0b11))};
+        csrw!("mepc", callback);
+        dbg!(); // 80000f06, 800001c8, 800001c0
+        core::arch::asm!("mret", options(noreturn));
+    }
+    // let trap_frame_addr = unsafe{&mut *(kalloc(1).unwrap() as *mut TrapFrame)};
+    // dbg!(core::ptr::addr_of!(trap_frame_addr));
+    // unsafe{*trap_frame_addr.trap_stack = kalloc(1).unwrap() as _};
+    // unsafe{
+    //     csrw!("mstatus", supervisor_mstatus.0);
+    //     dbg!(core::ptr::addr_of!(trap_frame_addr) as u64);
+    //     csrw!("mscratch", (core::ptr::addr_of!(trap_frame_addr)) as u64);
+    //     abort();
+    //     csrw!("mtvec", trap_vector_ptr);
+    //     abort();
+    //     abort();
         // csrw!("mip", interrupts_enable);
         // csrw!("sie", interrupts_enable);
         // csrw!("sip", interrupts_enable);
         // loop {}
-        // core::arch::asm!("
-        // sd t1, 0(sp)
-        // la t1, 4f
-        // addi t1, t1, 4
-        // csrw mepc, t1
-        // ld t1, 0(sp)
-        // mret
-        // 4:
-        // ");
-    }
+    // }
     abort();
-    dbg!(csrr!("mscratch"));
     // crate::wfi();
 }

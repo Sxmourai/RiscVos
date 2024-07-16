@@ -1,4 +1,8 @@
 #![no_std]
+// For format msg in panic info
+#![allow(internal_features)]
+#![feature(fmt_internals)]
+
 #![cfg_attr(debug_assertions, allow(unused, dead_code))]
 #[cfg(not(target_arch="riscv64"))]
 compile_error!("Target arch should be riscv 64 !");
@@ -17,8 +21,16 @@ pub mod riscv_utils;
 pub use heap::kalloc;
 
 #[panic_handler]
-fn panic(_info: &core::panic::PanicInfo<'_>) -> ! {
-    dbg!(_info);
+fn panic(info: &core::panic::PanicInfo<'_>) -> ! {
+    print!("PANIC: ");
+    if let Some(loc) = info.location() {
+        print!("at {}:{}:{} ", loc.file(), loc.line(), loc.column());
+    };
+    if let Some(msg) = info.message().as_str() {
+        println!("{}", msg);
+    } else {
+        println!("{}", alloc::string::ToString::to_string(&info.message()));
+    }
     loop {}
 }
 
@@ -122,10 +134,10 @@ bitfield::bitfield! {
 
     pub vs,   set_vs: 11, 9; // 2 bits !
     pub spp,  set_spp: 8; // holds previous privilege mode for supervisor traps (cuz it can only be User, only 1 bit)
-    pub mpie, set_mpie: 7;
-    pub spie, set_spie: 5;
-    pub mie,  set_mie: 3; // Global interrupt-enable bits supervisor mode
-    pub sie,  set_sie: 1; // Global interrupt-enable bits machine mode
+    pub mpie, set_mpie: 6;
+    pub spie, set_spie: 4;
+    pub mie,  set_mie: 3; // Global interrupt-enable bits machine    mode
+    pub sie,  set_sie: 1; // Global interrupt-enable bits supervisor mode
 }
 impl MSTATUS {
     pub fn read() -> Self {

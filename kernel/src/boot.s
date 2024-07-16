@@ -35,7 +35,7 @@ _start:
     li		t0, (0b11 << 11) # | (1 << 7) | (1 << 3) # | (1 << 5)
     csrw	mstatus, t0
     csrw	mie, zero # Don't want interrupts when we haven't set them up yet
-    la		t1, kmain # Load address of our main function (see src/main.rs)
+    la		t1, kinit # Load address of our main function (see src/main.rs)
     csrw	mepc, t1 # Set Machine Exception Program Counter
     la		ra, 3f
     # We use mret here so that the mstatus register is properly updated.
