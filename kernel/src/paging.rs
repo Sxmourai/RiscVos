@@ -53,11 +53,11 @@ impl PagingModes {
     pub fn satp(self) -> u64 {
         match self {
             PagingModes::Sv32 => todo!(),
-            PagingModes::Sv39 => 8,
-            PagingModes::Sv48 => 9,
-            PagingModes::Sv56 => 10,
-            PagingModes::Sv64 => 11,
-            PagingModes::Bare => 0,
+            PagingModes::Sv39 => 8<<60,
+            PagingModes::Sv48 => 9<<60,
+            PagingModes::Sv56 => 10<<60,
+            PagingModes::Sv64 => 11<<60,
+            PagingModes::Bare => 0<<60,
         }
     }
 }
@@ -330,13 +330,13 @@ pub fn get_page(vaddr: Sv39VirtualAddress) -> Option<&'static PageTableEntry> {
 }
 
 pub fn init() {
-    crate::println!("Initialising paging...");
+    info!("Initialising paging...");
     let mut satp = riscv::SATP(PagingModes::Sv39.satp());
     let root_page_table_ptr = crate::heap::kalloc(1).unwrap() as *mut PageTable;
     satp.set_ppn((root_page_table_ptr as u64) >> 12); // 2^12=4096
     unsafe { csrw!("satp", satp.0) };
     // Dummy addr:
-    let vaddr = Sv39VirtualAddress(0x7d_dead_beef);
+    let vaddr = Sv39VirtualAddress(0x100);
     let paddr = Sv39PhysicalAddress(0x7d_dead_beef);
     // Some need this
     let mut flags = PageTableEntryFlags(0b1111); // XWRV
@@ -347,7 +347,7 @@ pub fn init() {
     map(vaddr+4096, paddr+4096, flags);
     println!("{:?}", unsafe{get_root_pt()});
     assert_eq!(get_page(vaddr).unwrap().0, PageTableEntry::with_phys_pn(paddr).apply_flags(flags).0);
-    unsafe {core::ptr::write_volatile(0x7d_dead_beef as *mut u8, 10)};
+    unsafe {core::ptr::write_volatile(0x100 as *mut u8, 10)};
 }
 
 // Sv32:

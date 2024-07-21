@@ -19,7 +19,7 @@ extern "C" fn kinit() {
 extern "C" fn kmain() {
     kernel::plic::init();
     kernel::clint::init();
-    // kernel::paging::init();
+    kernel::paging::init();
     info!("Done");
     #[cfg(feature = "testing")]
     kernel::tests::test_all();
