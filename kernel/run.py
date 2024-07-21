@@ -44,5 +44,5 @@ except KeyboardInterrupt:
     pass
 # Erase last FLAG_EO_TESTS print and other qemu stuff
 sys.stdout.flush()
-print("\033[1A\r"+" "*os.get_terminal_size()[0])
+# print("\033[1A\r"+" "*os.get_terminal_size()[0])
 # print()

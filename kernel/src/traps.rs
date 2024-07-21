@@ -285,7 +285,7 @@ ret
 
 s_trap_vector:
 call store
-call	strap
+call strap
 call load
 
 sret

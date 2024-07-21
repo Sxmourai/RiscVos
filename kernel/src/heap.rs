@@ -8,6 +8,7 @@ extern "C" {
 pub struct HeapAllocator {
     heap_start: usize,
     heap_size: usize,
+    idx: spin::Mutex<usize>, // A simple pointer to last used page, we are going to change it ! Dono wori mai fryent
 }
 impl HeapAllocator {
     pub fn pages(&self, ) -> HeapPageIterator<'_> {
@@ -25,6 +26,7 @@ impl HeapAllocator {
                         continue 'pages;
                     }
                 }
+                *self.idx.lock() += page_count;
                 return Some(start_ptr)
             }
         }
@@ -41,6 +43,7 @@ impl HeapAllocator {
 
 unsafe impl core::alloc::GlobalAlloc for HeapAllocator {
     unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
+        dbg!(layout.size()); // /4096 ?
         let ptr = Self::alloc(self, layout.size()).unwrap();
         // let alignment = layout.align();
         // println!("{} {}", alignment, layout.size());
@@ -70,7 +73,8 @@ impl<'a> core::iter::Iterator for HeapPageIterator<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         if self.curr >= self.heap_allocator.heap_end() {return None}
         self.curr += 1;
-        Some(unsafe {(self.heap_allocator.heap_start as *mut Page).add(self.curr-1)})
+        let base = *self.heap_allocator.idx.lock();
+        Some(unsafe {(self.heap_allocator.heap_start as *mut Page).add(self.curr-1+base)})
     }
 }
 #[repr(C)]
@@ -87,10 +91,7 @@ impl Page {
 }
 
 #[global_allocator]
-pub static mut MAIN_HEAP_ALLOCATOR: HeapAllocator = HeapAllocator {
-    heap_start: 0,
-    heap_size: 0,
-};
+pub static mut MAIN_HEAP_ALLOCATOR: HeapAllocator = HeapAllocator {heap_start:0,heap_size:0, idx: spin::Mutex::new(0), };
 
 pub fn init() {
     println!("Initialising heap...");
@@ -99,6 +100,8 @@ pub fn init() {
     let heap_size = unsafe{core::ptr::addr_of!(_heap_size) as usize};
     unsafe{MAIN_HEAP_ALLOCATOR.heap_start = heap_start-(heap_start%4096)+4096};
     unsafe{MAIN_HEAP_ALLOCATOR.heap_size = heap_size};
+    assert!(heap_size>1_000_000, "Don't have enough memory !");
+    assert_eq!(unsafe{MAIN_HEAP_ALLOCATOR.heap_start%4096}, 0);
     // We now have Vecs & others ! 
 }
 

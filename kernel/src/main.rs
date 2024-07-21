@@ -18,10 +18,10 @@ extern "C" fn kinit() {
 
 #[no_mangle]// Supervisor mode
 extern "C" fn kmain() {
-    // println!("Supervisor m");
-    // kernel::paging::init();
-    // kernel::plic::init();
     println!("Booting: Risc-V os v0.0.0 ...");
+    kernel::paging::init();
+    println!("Done, entering loop");
+    // kernel::plic::init();
     #[cfg(feature = "testing")]
     kernel::tests::test_all();
     // unsafe {core::ptr::write_volatile(0x100 as *mut u8, 10)}

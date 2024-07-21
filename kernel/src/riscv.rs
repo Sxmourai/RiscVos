@@ -153,7 +153,7 @@ pub unsafe fn assert_mstatus() {
     let mstatus = csrr!("mstatus");
     unsafe { enter_mode(PrivilegeLevel::Machine) }
     if mstatus != csrr!("mstatus") {
-        dbg!(mstatus, MSTATUS::read());
+        dbg!(MSTATUS::read());
     }
 } 
 

@@ -63,9 +63,83 @@ impl PagingModes {
 }
 
 
-// pub static mut PageTables
+
+bitfield! {
+    // Only 56 bits
+    pub struct Sv39PhysicalAddress(u64);
+    impl Debug;
+
+    pub page_offset, set_page_offset: 11, 0;
+
+    pub ppn0, set_ppn0: 20, 12;
+    pub ppn1, set_ppn1: 29, 21;
+    pub ppn2, set_ppn2: 55, 30;
+}
+impl Clone for Sv39PhysicalAddress {
+    fn clone(&self) -> Self { *self }
+}
+impl Copy for Sv39PhysicalAddress {}
+
+bitfield! {
+    // Only 39 bits (Sv39... duh)
+    pub struct Sv39VirtualAddress(u64);
+    impl Debug;
+
+    pub page_offset, set_page_offset: 11, 0;
+
+    pub vpn0, set_vpn0: 20, 12;
+    pub vpn1, set_vpn1: 29, 21;
+    pub vpn2, set_vpn2: 38, 30;
+}
+impl Sv39VirtualAddress {
+    pub fn new(addr: u64) -> Self {
+        let mut _s = Self(addr);
+        // let page = addr/4096;
+        // _s.set_vpn0((page)&0x1FF);
+        // _s.set_vpn1((page>>9)&0x1FF);
+        // _s.set_vpn2((page>>18)&0x1FF);
+        // _s.set_page_offset(addr&0xFFF);
+        _s
+    }
+    pub fn vpn(self, vpni: u64) -> u64 {
+        assert!(vpni <= 3);
+        (self.0 >> ((9 * vpni)+12)) & 0x1FF
+    }
+}
+impl Clone for Sv39VirtualAddress {
+    fn clone(&self) -> Self { *self }
+}
+impl Copy for Sv39VirtualAddress {}
 
 
+
+// Can't derive cuz using bitfield
+impl Clone for PageTableEntry {
+    fn clone(&self) -> Self { *self }
+}
+impl Copy for PageTableEntry {}
+
+bitfield! {
+    pub struct PageTableEntryFlags(u64);
+    impl Debug;
+    pub valid, set_valid: 0;
+    pub readable, set_readable: 1;
+    pub writable, set_writable: 2;
+    pub executable, set_executable: 3;
+    pub user_mode_accessible, set_user_mode_accessible: 4;
+    pub global_mapping, set_global_mapping: 5;
+    pub accessed, set_accessed: 6;
+    pub dirty, set_dirty: 7;
+
+    pub rsw, set_rsw: 10, 8;
+
+    pub pbmt, set_pbmt: 62, 60;
+    pub n, set_n: 62;
+}
+impl Clone for PageTableEntryFlags {
+    fn clone(&self) -> Self { *self }
+}
+impl Copy for PageTableEntryFlags {}
 bitfield! {
     pub struct PageTableEntry(u64);
     impl Debug;
@@ -82,7 +156,7 @@ bitfield! {
     pub accessed, set_accessed: 6;
     pub dirty, set_dirty: 7;
 
-    pub rsw, set_rsw: 10, 8;
+    pub rsw, set_rsw: 9, 8;
 
     pub ppn0, set_ppn0: 19, 10;
     pub ppn1, set_ppn1: 28, 19;
@@ -116,91 +190,6 @@ impl PageTableEntry {
         Self(self.0 | flags.0)
     }
 }
-// Can't derive cuz using bitfield
-impl Clone for PageTableEntry {
-    fn clone(&self) -> Self { *self }
-}
-impl Copy for PageTableEntry {}
-
-bitfield! {
-    pub struct PageTableEntryFlags(u64);
-    impl Debug;
-    pub valid, set_valid: 0;
-    pub readable, set_readable: 1;
-    pub writable, set_writable: 2;
-    pub executable, set_executable: 3;
-    pub user_mode_accessible, set_user_mode_accessible: 4;
-    pub global_mapping, set_global_mapping: 5;
-    pub accessed, set_accessed: 6;
-    pub dirty, set_dirty: 7;
-
-    pub rsw, set_rsw: 10, 8;
-
-    pub pbmt, set_pbmt: 62, 60;
-    pub n, set_n: 62;
-}
-impl Clone for PageTableEntryFlags {
-    fn clone(&self) -> Self { *self }
-}
-impl Copy for PageTableEntryFlags {}
-
-bitfield! {
-    // Only 56 bits
-    pub struct Sv39PhysicalAddress(u64);
-    impl Debug;
-
-    pub page_offset, set_page_offset: 11, 0;
-
-    pub ppn0, set_ppn0: 21, 12;
-    pub ppn1, set_ppn1: 30, 21;
-    pub ppn2, set_ppn2: 56, 30;
-}
-impl Sv39PhysicalAddress {
-    pub fn new(paddr: u64) -> Self {        
-        let mut _s = Self(0);
-        let frame = paddr/4096;
-        _s.set_ppn0((frame)&0x1FF);
-        _s.set_ppn1((frame>>9)&0x1FF);
-        _s.set_ppn2((frame>>18)&0x3FF_FFFF);
-        _s
-    }
-}
-impl Clone for Sv39PhysicalAddress {
-    fn clone(&self) -> Self { *self }
-}
-impl Copy for Sv39PhysicalAddress {}
-
-bitfield! {
-    // Only 39 bits (Sv39... duh)
-    pub struct Sv39VirtualAddress(u64);
-    impl Debug;
-
-    pub page_offset, set_page_offset: 11, 0;
-
-    pub vpn0, set_vpn0: 21, 12;
-    pub vpn1, set_vpn1: 30, 21;
-    pub vpn2, set_vpn2: 39, 30;
-}
-impl Sv39VirtualAddress {
-    pub fn new(addr: u64) -> Self {
-        let mut _s = Self(addr);
-        // let page = addr/4096;
-        // _s.set_vpn0((page)&0x1FF);
-        // _s.set_vpn1((page>>9)&0x1FF);
-        // _s.set_vpn2((page>>18)&0x1FF);
-        // _s.set_page_offset(addr&0xFFF);
-        _s
-    }
-    pub fn vpn(self, vpni: u64) -> u64 {
-        assert!(vpni <= 3);
-        (self.0 >> ((9 * vpni)+12)) & 0x1FF
-    }
-}
-impl Clone for Sv39VirtualAddress {
-    fn clone(&self) -> Self { *self }
-}
-impl Copy for Sv39VirtualAddress {}
-
 pub struct PageTable {
     pub entries: [PageTableEntry; 512],
 }
@@ -211,12 +200,14 @@ impl PageTable {
             entries: [PageTableEntry(0b0); 512],
         }
     }
+    /// Automatically gets root page table, and page-level
+    /// Return: result
+    /// # Safety
+    /// Ultimate memory breaker, could write to different virtual addresses but be on same physical etc...
     pub unsafe fn map(&mut self, vaddr: Sv39VirtualAddress, paddr: Sv39PhysicalAddress, flags: PageTableEntryFlags) {
         assert!(PageTableEntry(flags.0).is_leaf());
-        dbg!(vaddr);
         let mut level = 3;
-        assert!((get_mode() == PrivilegeLevel::Supervisor || get_mode() == PrivilegeLevel::User));
-
+        // assert!((get_mode() == PrivilegeLevel::Supervisor || get_mode() == PrivilegeLevel::User));
         let mut current_page_table = self;
         let leaf_pte = loop {
             // dbg!(Sv39PhysicalAddress(current_pt_addr));
@@ -224,13 +215,13 @@ impl PageTable {
                 panic!("Not found ?")
             }
             level -= 1;
-            println!("\t----{}------", level);
+            // println!("\t----{}------", level);
             let mut pte = &mut current_page_table.entries[vaddr.vpn(level) as usize];
             // CAUTION! If accessing pte violates a PMA or PMP check, raise an access-fault exception corresponding to the
             // original access type
             if !pte.valid() {
-                println!("\tWriting new entry at idx {}", vaddr.vpn(level));
-                *pte = PageTableEntry(kalloc(1).unwrap() as u64>>2);
+                *pte = PageTableEntry::with_phys_pn(Sv39PhysicalAddress(kalloc(1).unwrap() as u64));
+                println!("\tLevel: {}, Writing new entry at idx {}, pointing to: {:x}", level, vaddr.vpn(level), pte.parse_ppn().0);
                 pte.set_valid(true);
                 if level == 0 {break pte;}
             }
@@ -238,163 +229,82 @@ impl PageTable {
             else if pte.is_leaf() {
                 break pte;
             }
-            // dbg!(pte, current_pt_addr);
-            current_page_table = match level-1 {
-                0 => unsafe{&mut *(pte.parse_ppn().0 as *mut PageTable)},
-                1 => unsafe{&mut *(pte.parse_ppn().0 as *mut PageTable)},
-                2 => unsafe{&mut *(pte.parse_ppn().0 as *mut PageTable)},
-                _ => {todo!()},
-            };
-            // pte.ppn(level).0*4096;
+            current_page_table = unsafe{&mut *(pte.parse_ppn().0 as *mut PageTable)};
         };
         *leaf_pte = PageTableEntry::with_phys_pn(paddr).apply_flags(flags);
-        dbg!(leaf_pte, leaf_pte.parse_ppn().0, paddr);
     }
 
-    pub unsafe fn get_page(&self, vaddr: Sv39VirtualAddress) -> Option<&PageTableEntry> {
+    pub fn get_page(&self, vaddr: Sv39VirtualAddress) -> Option<&PageTableEntry> {
         let mut level = 3;
-        assert!((get_mode() == PrivilegeLevel::Supervisor || get_mode() == PrivilegeLevel::User));
-
         let mut current_page_table = self;
         let leaf_pte = loop {
-            dbg!(level);
-            level -= 1;
             if level == 0 {
-                dbg!("Not found ?");
-                return None;
+                panic!("Not found ?")
             }
+            level -= 1;
             let mut pte = &current_page_table.entries[vaddr.vpn(level) as usize];
             if !pte.valid() {
-                return None;
+                return None; // TODO: Return result
             }
             else if !pte.readable() && pte.writable() {panic!("Invalid state entry !")}
             else if pte.is_leaf() {
                 break pte;
             }
-            current_page_table = match level-1 {
-                0 => unsafe{&mut *(pte.parse_ppn().0 as *mut PageTable)},
-                1 => unsafe{&mut *(pte.parse_ppn().0 as *mut PageTable)},
-                2 => unsafe{&mut *(pte.parse_ppn().0 as *mut PageTable)},
-                _ => {todo!()},
-            };
-            dbg!(core::ptr::addr_of!(current_page_table));
+            current_page_table = unsafe{&*(pte.parse_ppn().0 as *const PageTable)};
         };
-        Some(leaf_pte)
+        Some(&leaf_pte)
+    }
+}
+impl core::ops::Index<usize> for PageTable {
+    type Output = PageTableEntry;
+    fn index(&self, idx: usize) -> &Self::Output {
+        &self.entries[idx]
+    }
+}
+impl core::ops::IndexMut<usize> for PageTable {
+    fn index_mut(&mut self, idx: usize) -> &mut Self::Output {
+        &mut self.entries[idx]
     }
 }
 
-/// Automatically gets root page table, and page-level
-/// Return: result
-/// # Safety
-/// Ultimate memory breaker, could write to different virtual addresses but be on same physical etc...
-pub unsafe fn map(vaddr: Sv39VirtualAddress, paddr: Sv39PhysicalAddress, flags: PageTableEntryFlags) {
-    assert!(PageTableEntry(flags.0).is_leaf());
-    dbg!(vaddr);
-    let mut current_pt_addr = unsafe {ROOT_PAGE_TABLE.unwrap()} as u64;
-    let mut level = 3;
-    assert!((get_mode() == PrivilegeLevel::Supervisor || get_mode() == PrivilegeLevel::User));
+// let mut level = 3;
 
-    let leaf_pte = loop {
-        dbg!(Sv39PhysicalAddress(current_pt_addr));
-        if level == 0 {
-            panic!("Not found ?")
-        }
-        level -= 1;
-        println!("\t----{}------", level);
-        let pt = unsafe {&mut *(current_pt_addr as *mut PageTable)};
-        let mut pte = &mut pt.entries[vaddr.vpn(level) as usize];
-        // CAUTION! If accessing pte violates a PMA or PMP check, raise an access-fault exception corresponding to the
-        // original access type
-        if !pte.valid() {
-            println!("\tWriting new entry at idx {}", vaddr.vpn(level));
-            *pte = if level == 0 {PageTableEntry::with_phys_pn(paddr)} else {PageTableEntry(kalloc(1).unwrap() as u64>>2)};
-            pte.set_valid(true);
-            if level == 0 {
-                break pte;
-            }
-        }
-        else if !pte.readable() && pte.writable() {panic!("Invalid state entry !")}
-        else if pte.is_leaf() {
-            break pte;
-        }
-        dbg!(pte, current_pt_addr);
-        current_pt_addr = match level-1 {
-            0 => {pte.parse_ppn().0},
-            1 => {pte.parse_ppn().0},
-            2 => {pte.parse_ppn().0},
-            _ => {todo!()},
-        };
-        // pte.ppn(level).0*4096;
-    };
-    assert_eq!(leaf_pte.parse_ppn().0, paddr.0);
-    dbg!(leaf_pte, leaf_pte.parse_ppn().0, paddr);
-    
-}
+// let mut current_page_table = self;
+// let leaf_pte = loop {
+//     dbg!(level);
+//     level -= 1;
+//     if level == 0 {
+//         dbg!("Not found ?");
+//         return None;
+//     }
+//     let mut pte = &current_page_table.entries[vaddr.vpn(level) as usize];
+//     if !pte.valid() {
+//         return None;
+//     }
+//     else if !pte.readable() && pte.writable() {panic!("Invalid state entry !")}
+//     else if pte.is_leaf() {
+//         break pte;
+//     }
+//     current_page_table = match level-1 {
+//         0 => unsafe{&mut *(pte.parse_ppn().0 as *mut PageTable)},
+//         1 => unsafe{&mut *(pte.parse_ppn().0 as *mut PageTable)},
+//         2 => unsafe{&mut *(pte.parse_ppn().0 as *mut PageTable)},
+//         _ => {todo!()},
+//     };
+//     dbg!(core::ptr::addr_of!(current_page_table));
+// };
+// Some(leaf_pte)
 
 static mut ROOT_PAGE_TABLE: Option<*mut PageTable> = None;
 
 
-// This is from 10.3.2. Virtual Address Translation Process
-/// Returns
-/// If find the entry and is valid, returns the corresponding PageTableEntry inside Ok()
-/// If entry is invalid, returns a ptr to the entry, inside Err()
-pub fn get_page(va: Sv39VirtualAddress) -> Result<&'static mut PageTableEntry, *mut PageTableEntry> {
-    // Step 1.
-    dbg!(va);
-    let satp = SATP(csrr!("satp"));
-    let mut current_pt_addr = satp.ppn() * 4096;
-    let mut level = 3;
-    assert!((get_mode() == PrivilegeLevel::Supervisor || get_mode() == PrivilegeLevel::User));
-
-    let leaf_pte = loop {
-        dbg!(level, Sv39PhysicalAddress(current_pt_addr));
-        if level == 0 {
-            panic!("Not found ?")
-        }
-        level -= 1;
-        // Step 2.
-        let pt = unsafe {&mut *(current_pt_addr as *mut PageTable)};
-        let mut pte = &mut pt.entries[(va.vpn(level) * (core::mem::size_of::<Sv39VirtualAddress>() as u64)) as usize];
-        // CAUTION! If accessing pte violates a PMA or PMP check, raise an access-fault exception corresponding to the
-        // original access type
-        // let pte = unsafe { *(pte_addr as *mut PageTableEntry) };
-        // Step 3.
-        if !pte.valid() || (!pte.readable() && pte.writable()) {
-            // || pte.any_reserved_combination
-            // panic!("Page fault: trying to load from invalid entry !");
-            let mut _pte = *pte; // Little cheat =)
-            dbg_bits!(_pte.0);
-            dbg!(pte);
-            return Err(core::ptr::addr_of_mut!(_pte))
-        }
-        // Step 4.
-        if pte.is_leaf() {
-            // Step 5.
-            dbg!(pte);
-            break pte;
-        }
-        dbg!(pte);
-        current_pt_addr = match level {
-            0 => {pte.ppn0()},
-            1 => {pte.ppn1()},
-            2 => {pte.ppn2()},
-            _ => {todo!()},
-        }*4096;
-        // pte.ppn(level).0*4096;
-    };
-    Ok(leaf_pte)
-}
-
 pub fn init() {
     // return;
     crate::println!("Initialising paging...");
-    // unsafe{dbg!(csrr!("mstatus"))};
-    unsafe { enter_mode(PrivilegeLevel::Supervisor) };
-    // unsafe{dbg!(csrr!("mstatus"))};
-    let mut satp = riscv::SATP(0);
-    satp.set_mode(PagingModes::Sv39.satp());
+    let mut satp = riscv::SATP(PagingModes::Sv39.satp());
     // satp.set_asid();
     let root_page_table_ptr = crate::heap::kalloc(1).unwrap() as *mut PageTable;
+    dbg!(root_page_table_ptr);
     let mut root_page_table = PageTable::new();
     // for page_table in &mut root_page_table.entries {
     //     page_table.set_readable(1);
@@ -405,11 +315,15 @@ pub fn init() {
     unsafe { ROOT_PAGE_TABLE.replace(root_page_table_ptr) };
     satp.set_ppn((root_page_table_ptr as u64) >> 12); // 2^12=4096
     unsafe { csrw!("satp", satp.0) };
-    let vaddr = Sv39VirtualAddress(crate::traps::save_context as _);
-    let paddr = Sv39PhysicalAddress(kalloc(1).unwrap() as u64);
+    // Dummy addr:
+    let vaddr = Sv39VirtualAddress(0x100);
+    dbg!(vaddr);
+    let paddr = Sv39PhysicalAddress(0x7d_dead_beef);
     let mut flags = PageTableEntryFlags(0b1111); // XWRV
-    unsafe{(*ROOT_PAGE_TABLE.unwrap()).map(vaddr, paddr, flags)}
-    unsafe{(*ROOT_PAGE_TABLE.unwrap()).get_page(vaddr)};
+    // unsafe{(*ROOT_PAGE_TABLE.unwrap()).map(vaddr, paddr, flags)}
+    // assert_eq!(unsafe{(*ROOT_PAGE_TABLE.unwrap()).get_page(vaddr).unwrap()}.0, PageTableEntry::with_phys_pn(paddr).apply_flags(flags).0);
+    unsafe {(*ROOT_PAGE_TABLE.unwrap()).map(vaddr, paddr, flags)}
+    unsafe {core::ptr::write_volatile(0x100 as *mut u8, 10)};
     // let pte = get_page(vaddr);
     // crate::dbg!(pte);
     // crate::dbg_bits!(pte.unwrap().0);
