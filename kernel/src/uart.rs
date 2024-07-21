@@ -1,3 +1,5 @@
+use crate::{print, println};
+
 pub struct UART {
     base_port: *mut u8,
 }
@@ -39,6 +41,25 @@ impl UART {
             if self.base_port.add(5).read_volatile() & 1 != 0 { // Check DR bit
                 Some(self.base_port.add(0).read_volatile())
             } else {None}
+        }
+    }
+    pub fn handle_int(&self, ) {
+        let input_char = self.read_chr();
+        if let Some(input_char) = input_char {
+            match input_char {
+                127 => { // Backspace
+                    print!("{}{}{}", 8 as char, ' ', 8 as char);
+                },
+                10 | 13 => {
+                    println!();
+                },
+                3 => {// From what i've seen it's CTRL+C
+                    crate::tests::close_qemu()
+                },
+                _ => {
+                    print!("{}", input_char as char);
+                }
+            }
         }
     }
 }

@@ -61,9 +61,21 @@ macro_rules! pmpcfg_w {
         $crate::csrw!(concat!("pmpcfg", $i), $val)
     }};
 }
+#[macro_export]
+macro_rules! pmpaddr_r {
+    ($i: expr) => {{
+        $crate::csrr!(concat!("pmpaddr", $i))
+    }};
+}
+#[macro_export]
+macro_rules! pmpaddr_w {
+    ($i: expr, $val: expr) => {{
+        $crate::csrw!(concat!("pmpaddr", $i), $val)
+    }};
+}
 
 fn get_pmp_i_cfg(pmpcfgi: usize, i: usize) -> usize {
-    return pmpcfgi & (0xFF<<i)
+    return pmpcfgi & (0xFF<<(i*8))
 }
 
 pub fn init() {
@@ -71,5 +83,7 @@ pub fn init() {
     let mut cfg = PMPConfigRegFormat(0b111); // RWX
     cfg.set_a(PMPConfigRegFormatA::TOR as u64);
     unsafe{pmpcfg_w!(2, cfg.0)};
-    dbg!(unsafe{pmpcfg_r!(2)});
+    unsafe{pmpaddr_w!(2, 0xFFFF_FFFF_FFFFu64)};
+    // dbg!(unsafe{pmpcfg_r!(2)});
+    // dbg!(unsafe{pmpaddr_r!(2)});
 }

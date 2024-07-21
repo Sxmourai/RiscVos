@@ -193,7 +193,7 @@ impl PageTableEntry {
         Self((ppn.0 & !(0xFFF)) >> 2)
     }
     pub fn parse_ppn(self) -> Sv39PhysicalAddress {
-        Sv39PhysicalAddress((self.0&!(0x3FF))<<2)// Get only bits 56-10 and shift by 2 to right 
+        Sv39PhysicalAddress((self.0<<2)&!(0xFFF)) // Get only bits 56-10 and shift by 2 to right 
     }
     // If Read or Write or Execute bit is set, then it is a leaf, else it's a branch
     pub fn is_leaf(self) -> bool {
@@ -230,6 +230,7 @@ impl core::fmt::Debug for PageTableEntry {
         Ok(())
     }
 }
+#[repr(C)]
 pub struct PageTable {
     pub entries: [PageTableEntry; 512],
 }
@@ -337,19 +338,17 @@ pub fn init() {
     // Dummy addr:
     let vaddr = Sv39VirtualAddress(0x7d_dead_beef);
     let paddr = Sv39PhysicalAddress(0x7d_dead_beef);
+    // Some need this
     let mut flags = PageTableEntryFlags(0b1111); // XWRV
+    flags.set_dirty(true);
+    flags.set_accessed(true);
+
     map(vaddr, paddr, flags);
     map(vaddr+4096, paddr+4096, flags);
     println!("{:?}", unsafe{get_root_pt()});
-    dbg!(get_page(vaddr).unwrap());
     assert_eq!(get_page(vaddr).unwrap().0, PageTableEntry::with_phys_pn(paddr).apply_flags(flags).0);
     unsafe {core::ptr::write_volatile(0x7d_dead_beef as *mut u8, 10)};
-    // let pte = get_page(vaddr);
-    // crate::dbg!(pte);
-    // crate::dbg_bits!(pte.unwrap().0);
-    // unsafe{core::arch::asm!("csrw satp, {}", in(reg) satp)};
 }
-
 
 // Sv32:
 
