@@ -23,7 +23,6 @@ extern "C" fn kmain() {
     info!("Done");
     #[cfg(feature = "testing")]
     kernel::tests::test_all();
-    // unsafe {core::ptr::write_volatile(0x100 as *mut u8, 10)}
 	loop {
         riscv::wfi()
     }
