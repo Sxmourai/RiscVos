@@ -1,4 +1,4 @@
 kernel/target/**
 emulator/target/**
 Risc V - Priviledged ISA.pdf
-**/__pycache
+**/__pycache__

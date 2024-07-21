@@ -1,5 +1,7 @@
 // For cpu exceptions and interrupts
 
+use riscv::PrivilegeLevel;
+
 use crate::*;
 
 pub enum InterruptsMode {
@@ -65,13 +67,13 @@ pub fn load_context(addr: usize) {
     }
 }
 pub enum Interrupts {
-    SupervisorSoftwareInterrupt = 1,
-    MachineSoftwareInterrupt = 3,
-    SupervisorTimerInterrupt = 5,
-    MachineTimerInterrupt = 7,
-    SupervisorExternalInterrupt = 9,
-    MachineExternalInterrupt = 11,
-    CounterOverflowInterrupt = 13,
+    SupervisorSoftware = 1<<1,
+    MachineSoftware = 1<<3,
+    SupervisorTimer = 1<<5,
+    MachineTimer = 1<<7,
+    SupervisorExternal = 1<<9,
+    MachineExternal = 1<<11,
+    CounterOverflow = 1<<13,
 }
 pub enum Exceptions {
     InstructionAddressMisaligned = 0,
@@ -301,31 +303,37 @@ mret
 pub fn init(callback: u64) {
     println!("\x1b[0;32mInitialising\x1b[0m traps...");
     // PMP seems cool too
-    let mut supervisor_mstatus = MSTATUS(0);
+    let mut supervisor_mstatus = riscv::MSTATUS(PrivilegeLevel::supervisor());
     supervisor_mstatus.set_mpie(true); // I think mpie should be set anyway, because we can't have spie and not mpie (see ISA / doc)
     supervisor_mstatus.set_spie(true);
     // dbg_bits!(supervisor_mstatus.0);
-    // supervisor_mstatus.set_mie(true);
-    // supervisor_mstatus.set_sie(true);
+    supervisor_mstatus.set_mie(true);
+    supervisor_mstatus.set_sie(true);
+    // pmpaddr0::write(0x3fffffffffffff);
+    // pmpcfg0::set_pmp(0, Range::TOR, Permission::RWX, false); // 0 < addr < pmpaddr0
+
     unsafe{
-        csrw!("mstatus", 1<<11 | 1<<7 | 1<<5);
+        csrw!("mstatus", supervisor_mstatus.0);
         dbg_bits_reg!("mstatus");
         csrw!("satp", 0);
         // Delegate all interrupts to supervisor mode (so that we only have 1 interrupt handler)
         csrw!("medeleg", 0xffff);
         csrw!("mideleg", 0xffff);
-        dbg!(m_trap_vector as u64);
         csrw!("mtvec", m_trap_vector as u64 & !(0b11));
         // let trap_frame_addr = unsafe{&mut *(kalloc(1).unwrap() as *mut TrapFrame)};
         // dbg!(core::ptr::addr_of!(trap_frame_addr));
         // dbg!();
         // unsafe{*trap_frame_addr.trap_stack = kalloc(1).unwrap() as _};
         // csrw!("mscratch", (core::ptr::addr_of!(trap_frame_addr)) as u64);
-        csrw!("mie", (1<<Interrupts::SupervisorTimerInterrupt as u64) | (1<<Interrupts::SupervisorSoftwareInterrupt as u64) | (1<<Interrupts::SupervisorExternalInterrupt as u64));
+        // use Interrupts as Int;(Int::SupervisorTimer as u64) | (Int::SupervisorSoftware as u64) | (Int::SupervisorExternal as u64) |
+        // (Int::MachineTimer as u64) | (Int::MachineSoftware as u64) | (Int::MachineExternal as u64)
+        csrw!("mie", 0xFFFF);
+        csrw!("sie", 0xFFFF);
         unsafe{csrw!("stvec", s_trap_vector as u64 & !(0b11))};
         csrw!("mepc", callback);
-        dbg!(); // 80000f06, 800001c8, 800001c0
-        core::arch::asm!("mret", options(noreturn));
+        core::arch::asm!("
+        // csrw mepc, 
+        mret", options(noreturn));
     }
     // let trap_frame_addr = unsafe{&mut *(kalloc(1).unwrap() as *mut TrapFrame)};
     // dbg!(core::ptr::addr_of!(trap_frame_addr));

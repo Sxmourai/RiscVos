@@ -1,6 +1,7 @@
 use core::cell::OnceCell;
 
 use bitfield::bitfield;
+use riscv::{enter_mode, get_mode, PrivilegeLevel, SATP};
 
 use crate::*;
 
@@ -390,7 +391,7 @@ pub fn init() {
     // unsafe{dbg!(csrr!("mstatus"))};
     unsafe { enter_mode(PrivilegeLevel::Supervisor) };
     // unsafe{dbg!(csrr!("mstatus"))};
-    let mut satp = SATP(0);
+    let mut satp = riscv::SATP(0);
     satp.set_mode(PagingModes::Sv39.satp());
     // satp.set_asid();
     let root_page_table_ptr = crate::heap::kalloc(1).unwrap() as *mut PageTable;

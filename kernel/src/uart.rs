@@ -13,7 +13,7 @@ impl UART {
     pub fn init(&mut self) {
         let port = self.base_port;
         unsafe { port.add(2).write_volatile(0b1) }; // enable FIFO 
-        unsafe { port.add(1).write_volatile(0b1) }; // Enable interrupts
+        unsafe { port.add(1).write_volatile(0b1111) }; // Enable interrupts
 
         unsafe { port.add(3).write_volatile(1<<7) };
         // Also set bit to talk to the DLM (divisor latch most)
