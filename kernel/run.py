@@ -26,6 +26,7 @@ read = ""
 try:
     while True:
         read += cmd.stdout.read(1).decode(errors="ignore")
+        if len(read)==0:break
         print(read[-1], end="")
         sys.stdout.flush()
         # decoded_read = read.decode(errors="ignore")

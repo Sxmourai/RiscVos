@@ -41,5 +41,12 @@ python clippy.py --allow-dirty
 __CARGO_FIX_YOLO=1 cargo clippy --allow-dirty
 ```
 
+## Getting virt infos:
+```bash
+python3 run.py --qemu-args "-machine dumpdtb=out.dtb"
+dtc --in-format dtb --out-format dts out.dtb --out out.dts
+```
+
+
 ## Cool resources
 - https://projectf.io

@@ -93,7 +93,7 @@ impl Page {
 pub static mut MAIN_HEAP_ALLOCATOR: HeapAllocator = HeapAllocator {heap_start:0,heap_size:0, idx: spin::Mutex::new(0), };
 
 pub fn init() {
-    println!("Initialising heap...");
+    info!("Initialising heap...");
     // Idk why, it should be the value, but the value is 0 and the address is the value...
     let heap_start = unsafe{core::ptr::addr_of!(_heap_start) as usize};
     let heap_size = unsafe{core::ptr::addr_of!(_heap_size) as usize};

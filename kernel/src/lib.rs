@@ -12,19 +12,23 @@
 #[cfg(not(target_arch="riscv64"))]
 compile_error!("Target arch should be riscv 64 !");
 extern crate alloc;
+pub use log::{trace,debug,info,warn,error};
 
-
-pub mod tests;
-pub mod uart;
-pub mod console;
-pub mod heap;
-pub mod paging;
-pub mod traps;
-pub mod plic;
 pub mod riscv;
+pub mod tests;
+
+pub mod uart;
+pub mod logging;
+
+pub mod heap;
+pub use heap::kalloc;
+pub mod paging;
 pub mod pmp;
 
-pub use heap::kalloc;
+pub mod traps;
+pub mod plic;
+pub mod clint;
+
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo<'_>) -> ! {

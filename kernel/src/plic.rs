@@ -66,7 +66,7 @@ impl PLIC {
 }
 
 pub fn init() {
-    println!("Initialising PLIC...");
+    info!("Initialising PLIC...");
     PLIC.enable_interrupt(10); // UART0 interrupt (see qemu source code)
     PLIC.set_priority(10, 2);
     PLIC.set_threshold(0);

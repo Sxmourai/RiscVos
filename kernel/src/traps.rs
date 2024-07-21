@@ -106,14 +106,14 @@ extern "C" fn mtrap() {
             1 => {println!("Supervisor software interrupt")},
             3 => {println!("Machine software interrupt")},
             5 => {println!("Supervisor timer interrupt")},
-            7 => {println!("Machine timer interrupt")},
+            7 => {clint::handle_int()},
             9 => {println!("Supervisor external interrupt")},
             11 => {
                 use plic::PLIC;
                 if let Some(int) = PLIC.claim_int() {
                     match int {
-                        10 => unsafe{console::STDIO_UART.handle_int();},
-                        _ => todo!()
+                        10 => unsafe{logging::STDIO_UART.handle_int();},
+                        _ => todo!("Support this interrupt: {} !", int)
                     }
                     PLIC.eoi(int);
                 } else {
@@ -370,7 +370,7 @@ mret
 
 
 pub fn init(callback: u64) {
-    println!("\x1b[0;32mInitialising\x1b[0m traps...");
+    info!("Initialising traps...");
     // PMP seems cool too
     let mut supervisor_mstatus = riscv::MSTATUS(PrivilegeLevel::supervisor());
     supervisor_mstatus.set_mpie(true); // I think mpie should be set anyway, because we can't have spie and not mpie (see ISA / doc)
