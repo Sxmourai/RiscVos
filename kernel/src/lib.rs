@@ -4,6 +4,8 @@
 #![feature(fmt_internals)]
 
 #![cfg_attr(debug_assertions, allow(unused, dead_code))]
+#![cfg_attr(debug_assertions, warn(unused_results))]
+#![cfg_attr(not(debug_assertions), warn(clippy::unwrap_used))]
 // So that we make sure unsafe code is wrapped into `unsafe` even if the function is marked as unsafe.
 // This is usefull, because we can see *clearly* where our unsafe blocks are.
 #![warn(unsafe_op_in_unsafe_fn)]

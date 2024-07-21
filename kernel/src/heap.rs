@@ -43,8 +43,7 @@ impl HeapAllocator {
 
 unsafe impl core::alloc::GlobalAlloc for HeapAllocator {
     unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
-        dbg!(layout.size()); // /4096 ?
-        let ptr = Self::alloc(self, layout.size()).unwrap();
+        let ptr = Self::alloc(self, layout.size().div_ceil(4096)).unwrap();
         // let alignment = layout.align();
         // println!("{} {}", alignment, layout.size());
         ptr as _
