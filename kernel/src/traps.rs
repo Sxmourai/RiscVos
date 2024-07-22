@@ -126,6 +126,7 @@ extern "C" fn mtrap() {
             _ => {println!("Interrupt cause: {:b}", id);},
         }
     } else {
+        println!("Exception {} from mode: {}", id, riscv::MSTATUS::read().mpp());
         match id {
             0 => {println!("Instruction address misaligned: {}", mtval)},
             1 => {println!("Instruction access fault: {}", mtval)},
@@ -145,6 +146,17 @@ extern "C" fn mtrap() {
             19 => {println!("Hardware error: {}", mtval)},
             _ => {dbg!(cause, mtval);},
         }
+        let sp = regr!("sp")+0x100;
+        let stack = unsafe { core::slice::from_raw_parts(sp as *const u64, 100) };
+        dbg!(stack);
+        print!("ERR_FROM_ADDR:{}", csrr!("mepc"));
+        for val in stack {
+            if *val >= 0x8000_0000 && *val <= riscv::stack_start() {
+                print!(",{}", val);
+            }
+        }
+        println!("");
+        panic!()
     }
 }
 
@@ -153,9 +165,8 @@ extern "C" fn strap() {
     let cause = csrr!("scause", u64);
     let is_interrupt = cause & 1u64<<63 != 0;
     let id = cause & 0xFF;
-    crate::print!("Trap: {}\t", id);
+    // crate::print!("Trap: {}\t", id);
     let mtval = csrr!("stval", u64);
-    dbg!(mtval);
     if is_interrupt {
         match id {
             1 => {println!("Supervisor software interrupt")},
@@ -170,22 +181,22 @@ extern "C" fn strap() {
         }
     } else {
         match id {
-            0 => {println!("Instruction address misaligned: {}", mtval)},
-            1 => {println!("Instruction access fault: {}", mtval)},
-            2 => {println!("Illegal instruction: {}", mtval)},
-            3 => {println!("Breakpoint: {}", mtval)},
-            4 => {println!("Load address misaligned: {}", mtval)},
-            5 => {println!("Load access fault: {}", mtval)},
-            6 => {println!("Store/AMO address misaligned: {}", mtval)},
-            7 => {println!("Store/AMO access fault: {}", mtval)},
-            8 => {println!("Environment call from U-mode: {}", mtval)},
-            9 => {println!("Environment call from S-mode: {}", mtval)},
-            11 => {println!("Environment call from M-mode: {}", mtval)},
-            12 => {println!("Instruction page fault: {}", mtval)},
-            13 => {println!("Load page fault: {}", mtval)},
-            15 => {println!("Store/AMO page fault: {}", mtval)},
-            18 => {println!("Software check: {}", mtval)},
-            19 => {println!("Hardware error: {}", mtval)},
+            0 => {todo!("Instruction address misaligned: {}", mtval)},
+            1 => {todo!("Instruction access fault: {}", mtval)},
+            2 => {todo!("Illegal instruction: {}", mtval)},
+            3 => {todo!("Breakpoint: {}", mtval)},
+            4 => {todo!("Load address misaligned: {}", mtval)},
+            5 => {todo!("Load access fault: {}", mtval)},
+            6 => {todo!("Store/AMO address misaligned: {}", mtval)},
+            7 => {todo!("Store/AMO access fault: {}", mtval)},
+            8 => {todo!("Environment call from U-mode: {}", mtval)},
+            9 => {todo!("Environment call from S-mode: {}", mtval)},
+            11 => {todo!("Environment call from M-mode: {}", mtval)},
+            12 => {todo!("Instruction page fault: {}", mtval)},
+            13 => {todo!("Load page fault: {}", mtval)},
+            15 => {todo!("Store/AMO page fault: {}", mtval)},
+            18 => {todo!("Software check: {}", mtval)},
+            19 => {todo!("Hardware error: {}", mtval)},
             _ => {dbg!(cause, mtval);},
         }
     }
@@ -385,8 +396,8 @@ pub fn init(callback: u64) {
         csrw!("mstatus", supervisor_mstatus.0);
         csrw!("satp", 0);
         // Delegate all interrupts to supervisor mode (so that we only have 1 interrupt handler)
-        csrw!("medeleg", 0xffff);
-        csrw!("mideleg", 0xffff);
+        // csrw!("medeleg", 0xffff);
+        // csrw!("mideleg", 0xffff);
         csrw!("mtvec", m_trap_vector as u64 & !(0b11));
         // use Interrupts as Int;(Int::SupervisorTimer as u64) | (Int::SupervisorSoftware as u64) | (Int::SupervisorExternal as u64) |
         // (Int::MachineTimer as u64) | (Int::MachineSoftware as u64) | (Int::MachineExternal as u64)

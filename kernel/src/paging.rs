@@ -273,7 +273,9 @@ impl core::fmt::Debug for PageTable {
 }
 
 pub unsafe fn get_root_pt() -> &'static mut PageTable {
-    let addr = SATP::read().ppn()<<12;
+    let satp = SATP::read();
+    if satp.mode() == 0 {warn!("Trying to get page table but mode is BARE !");}
+    let addr = satp.ppn()<<12;
     unsafe{&mut *(addr as *mut _)}
 }
 /// Automatically gets root page table, and page-level
@@ -284,11 +286,13 @@ pub unsafe fn get_root_pt() -> &'static mut PageTable {
 pub fn map(vaddr: Sv39VirtualAddress, paddr: Sv39PhysicalAddress, flags: PageTableEntryFlags) {
     assert!(PageTableEntry(flags.0).is_leaf());
     let mut level = 3;
+    dbg!();
     let mut current_page_table = unsafe{get_root_pt()};
     let leaf_pte = loop {
         if level == 0 {
             panic!("Not found ?")
         }
+        dbg!(current_page_table);
         level -= 1;
         let mut pte = &mut current_page_table.entries[vaddr.vpn(level) as usize];
         // CAUTION! If accessing pte violates a PMA or PMP check, raise an access-fault exception corresponding to the
@@ -329,25 +333,43 @@ pub fn get_page(vaddr: Sv39VirtualAddress) -> Option<&'static PageTableEntry> {
     Some(&leaf_pte)
 }
 
+#[macro_export]
+macro_rules! map {
+    ($vaddr: expr) => {
+        $crate::map!($vaddr, $crate::heap::kalloc(1).unwrap() as *mut PageTable, flags=PageTableEntryFlags::RWX)
+    };
+    ($vaddr: expr, $paddr: expr) => {
+        $crate::map!($vaddr, $paddr, flags=PageTableEntryFlags::RWX)
+    };
+    ($vaddr: expr, flags=$flags: expr) => {
+        $crate::map!($vaddr, $crate::heap::kalloc(1).unwrap() as *mut PageTable, $flags)
+    };
+    ($vaddr: expr, $paddr: expr, flags=$flags: expr) => {
+        $crate::paging::map($vaddr, $paddr, $flags)
+    };
+}
+
 pub fn init() {
-    info!("Initialising paging...");
+    info!("Initialising paging...");// 80000ea0 3cf489c0 8081 0000  4bef18c0
     let mut satp = riscv::SATP(PagingModes::Sv39.satp());
     let root_page_table_ptr = crate::heap::kalloc(1).unwrap() as *mut PageTable;
     satp.set_ppn((root_page_table_ptr as u64) >> 12); // 2^12=4096
     unsafe { csrw!("satp", satp.0) };
     // Dummy addr:
-    let vaddr = Sv39VirtualAddress(0x100);
+    let vaddr = Sv39VirtualAddress(0x7d_dead_beef);
     let paddr = Sv39PhysicalAddress(0x7d_dead_beef);
     // Some need this
     let mut flags = PageTableEntryFlags(0b1111); // XWRV
     flags.set_dirty(true);
     flags.set_accessed(true);
-
     map(vaddr, paddr, flags);
     map(vaddr+4096, paddr+4096, flags);
     println!("{:?}", unsafe{get_root_pt()});
     assert_eq!(get_page(vaddr).unwrap().0, PageTableEntry::with_phys_pn(paddr).apply_flags(flags).0);
-    unsafe {core::ptr::write_volatile(0x100 as *mut u8, 10)};
+    unsafe {core::ptr::write_volatile(vaddr.0 as *mut u8, 10)};
+    assert_eq!(unsafe {core::ptr::read_volatile(vaddr.0 as *const u8)}, 10);
+    unsafe {core::ptr::write_volatile(vaddr.0 as *mut u8, 9)};
+    assert_eq!(unsafe {core::ptr::read_volatile(vaddr.0 as *const u8)}, 11);
 }
 
 // Sv32:

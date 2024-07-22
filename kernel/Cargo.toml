@@ -16,10 +16,12 @@ spin = "0.9.8"
 
 [profile.dev]
 panic="abort"
-strip = true
+strip = false
+debug = true
+split-debuginfo = "unpacked"
 
-[profile.dev.package."*"]
-opt-level = "z"
+# [profile.dev.package."*"]
+# opt-level = "z"
 
 [profile.release]
 panic="abort"

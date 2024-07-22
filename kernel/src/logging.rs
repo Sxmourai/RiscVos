@@ -23,7 +23,7 @@ macro_rules! dbg_bits {
         {
             $crate::println!("[{}:{}] {} = {:b}", file!(), line!(), stringify!($val), &$val);
             // crate::dbg!($($vals),*);
-            $( $crate::dbg!($vals); )*
+            $( $crate::dbg_bits!($vals); )*
         }
     };
 }

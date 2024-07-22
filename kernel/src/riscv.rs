@@ -12,12 +12,20 @@ macro_rules! csrr {
     }};
 }
 #[macro_export]
+macro_rules! regr {($reg: expr) => {{$crate::regr!($reg, u64)}};
+    ($reg: expr, $res: ty) => {{
+        let mut res: $res;
+        unsafe{core::arch::asm!(concat!("mv {}, ", $reg), out(reg) res)};
+        res
+    }};
+}
+#[macro_export]
 macro_rules! csrw {
     ($reg: expr, $val: expr) => {{
         csrw!($reg, $val, u64)
     }};
     ($reg: expr, $val: expr, $res: ty) => {{
-        core::arch::asm!(concat!("csrw ", $reg, ", {}"), in(reg) $val);
+        core::arch::asm!(concat!("csrw ", $reg, ", {}"), in(reg) $val, options(nostack, preserves_flags, nomem));
     }};
 }
 
@@ -160,4 +168,22 @@ pub unsafe fn assert_mstatus() {
 
 pub fn spin_loop() -> ! {
     loop {wfi()}
+}
+
+extern "C" {
+    static _stack_start: u64;
+    static _stack_end: u64;
+}
+pub fn stack_start() -> u64 {
+    unsafe{core::ptr::addr_of!(_stack_start) as _}
+}
+pub fn stack_end() -> u64 {
+    unsafe{core::ptr::addr_of!(_stack_end) as _}
+}
+
+pub fn read_sp() -> u64 {
+    let mut res;
+    unsafe {core::arch::asm!("mv {}, sp", out(reg) res)};
+    // if (core::ptr::addr_of!(_stack_start) as u64)<res {todo!()}
+    res
 }

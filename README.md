@@ -11,6 +11,9 @@ I followed https://osblog.stephenmarz.com/ to get things started
 - Python
 - Rust (nightly)
 - Risc V binutils (for emulator)
+If you want some debugging information:
+- rustfilt (`cargo install rustfilt`)
+
 
 ## Running
 

@@ -1,4 +1,5 @@
 use core::time::Duration;
+use crate::*;
 
 
 pub enum CLINTRegs {
@@ -66,4 +67,5 @@ pub fn init() {
 
 pub fn handle_int() {
     CLINT.try_trigger_in(Duration::from_secs(1));
+    unsafe {core::ptr::write_volatile(0x100 as *mut u8, 10)};
 }
