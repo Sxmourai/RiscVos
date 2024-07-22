@@ -5,6 +5,9 @@ use riscv::{enter_mode, get_mode, PrivilegeLevel, SATP};
 
 use crate::*;
 
+pub const PAGE_SIZE: usize = 4096; // 0x1000
+pub const PAGE_SIZE64: u64 = 0x1000;
+
 // PMP -> Physical memory protection
 // PMP checks are only in Supervised or User mode
 //////////// Or data accesses in Machine mode (our mode for now) when the MPRV bit is set
@@ -101,11 +104,6 @@ bitfield! {
 impl Sv39VirtualAddress {
     pub fn new(addr: u64) -> Self {
         let mut _s = Self(addr);
-        // let page = addr/4096;
-        // _s.set_vpn0((page)&0x1FF);
-        // _s.set_vpn1((page>>9)&0x1FF);
-        // _s.set_vpn2((page>>18)&0x1FF);
-        // _s.set_page_offset(addr&0xFFF);
         _s
     }
     pub fn vpn(self, vpni: u64) -> u64 {
@@ -363,7 +361,7 @@ pub fn init() {
     flags.set_dirty(true);
     flags.set_accessed(true);
     map(vaddr, paddr, flags);
-    map(vaddr+4096, paddr+4096, flags);
+    map(vaddr+PAGE_SIZE64, paddr+PAGE_SIZE64, flags);
     println!("{:?}", unsafe{get_root_pt()});
     assert_eq!(get_page(vaddr).unwrap().0, PageTableEntry::with_phys_pn(paddr).apply_flags(flags).0);
     unsafe {core::ptr::write_volatile(vaddr.0 as *mut u8, 10)};

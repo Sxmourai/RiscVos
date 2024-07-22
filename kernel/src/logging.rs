@@ -61,7 +61,7 @@ pub fn debug_symbols() {
 pub static mut STDIO_UART: crate::uart::UART = unsafe{crate::uart::UART::new(0x1000_0000)}; 
 impl log::Log for crate::uart::UART {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
-        metadata.level() <= log::Level::Info
+        metadata.level() <= log::max_level()
     }
 
     fn log(&self, record: &log::Record) {
@@ -86,7 +86,11 @@ pub fn init() {
     unsafe { 
         STDIO_UART.init();
         #[allow(static_mut_refs)] // I think deprecated in 2024 version
+        #[cfg(debug_assertions)]
         log::set_logger(&STDIO_UART)
-             .map(|()| log::set_max_level(log::LevelFilter::Info))
+            .map(|()| log::set_max_level(log::LevelFilter::Debug));
+        #[cfg(not(debug_assertions))]
+        log::set_logger(&STDIO_UART)
+            .map(|()| log::set_max_level(log::LevelFilter::Info));
     };
 }

@@ -19,7 +19,13 @@ KERNEL_FILE="/".join((TARGET_DIR,PROFILE_PATH,"kernel"))
 # And append to QEMU: -drive if=none,format=raw,file=$(DRIVE),id=fat_disk -device virtio-blk-device,scsi=off,drive=fat_disk
 import subprocess
 import sys
-qemu = subprocess.Popen(f"qemu-system-riscv64 -machine virt -smp {args.cpu_count} -m {args.mem_size} -nographic -serial mon:stdio -bios none -kernel {KERNEL_FILE} {args.qemu_args}".split(" "), stdout=subprocess.PIPE)
+qemu = subprocess.Popen(map(lambda x: x.strip(), filter(lambda w: w.strip() != "", f"""qemu-system-riscv64 
+                        -machine virt -smp {args.cpu_count} -m {args.mem_size} 
+                        -nographic -serial mon:stdio -bios none 
+                        -drive if=none,format=raw,file=disk.hdd,id=fat_disk -device virtio-blk-device,scsi=off,drive=fat_disk
+                        -kernel {KERNEL_FILE} 
+                        -msg timestamp=on,guest-name=on 
+                        {args.qemu_args}""".split(" "))), stdout=subprocess.PIPE)
 print(" ".join(qemu.args))
 print()
 read = ""
