@@ -2,11 +2,13 @@
 #![feature(custom_inner_attributes)]
 #![clippy::allow(all)]
 
-pub fn manipulations() {
-    let mut pte = kernel::paging::PageTableEntry(0);
-    pte.set_ppn0(0x8000013/4096);
-    pte.set_ppn0(0x1234/4096);
-    pte.set_ppn0(0x5678/4096);
-    kernel::dbg!(kernel::paging::PageTableEntry::with_phys_pn(pte.parse_ppn()).parse_ppn());
-    kernel::dbg!(pte.parse_ppn());
+pub fn paging_rw() {
+    use crate::paging::*;
+    let addr = crate::riscv::stack_start() as u64;
+    map!(addr);
+    let vaddr = Sv39VirtualAddress(addr);
+    let paddr = Sv39PhysicalAddress(addr);
+    assert_eq!(get_page(vaddr).unwrap().0, PageTableEntry::with_phys_pn(paddr).apply_flags(PageTableEntryFlags::rwx()).0);
+    unsafe {core::ptr::write_volatile(vaddr.0 as *mut u8, 10)};
+    assert_eq!(unsafe {core::ptr::read_volatile(vaddr.0 as *const u8)}, 10);
 }

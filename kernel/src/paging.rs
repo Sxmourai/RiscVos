@@ -371,11 +371,7 @@ macro_rules! map {
 
 pub fn init() {
     info!("Initialising paging...");// 80000ea0 3cf489c0 8081 0000  4bef18c0
-    // Some need this
-    let mut flags = PageTableEntryFlags(0b1111); // XWRV
-    flags.set_dirty(true);
-    flags.set_accessed(true);
-    
+
     let mut satp = riscv::SATP(PagingModes::Sv39.satp());
     let root_page_table_ptr = crate::heap::kalloc(1).unwrap() as *mut PageTable;
     satp.set_ppn((root_page_table_ptr as u64) >> 12); // 2^12=4096
@@ -386,14 +382,9 @@ pub fn init() {
     for page in (memory_start()..stack_end()+PAGE_SIZE*100).step_by(PAGE_SIZE) {
         unsafe{rpt.map(Sv39VirtualAddress(page as _), Sv39PhysicalAddress(page as _), PageTableEntryFlags(0b1111)).unwrap()};
     }
-    unsafe{rpt.map(Sv39VirtualAddress(0x1000_0000), Sv39PhysicalAddress(0x1000_0000), PageTableEntryFlags(0b1111)).unwrap()};
+    // unsafe{rpt.map(Sv39VirtualAddress(0x1000_0000 as _), Sv39PhysicalAddress(0x1000_0000 as _), PageTableEntryFlags(0b1111)).unwrap()};
     unsafe { csrw!("satp", satp.0) };
-    // println!("{:?}", unsafe{get_root_pt()});
-    // assert_eq!(get_page(vaddr).unwrap().0, PageTableEntry::with_phys_pn(paddr).apply_flags(flags).0);
-    // unsafe {core::ptr::write_volatile(vaddr.0 as *mut u8, 10)};
-    // assert_eq!(unsafe {core::ptr::read_volatile(vaddr.0 as *const u8)}, 10);
-    // unsafe {core::ptr::write_volatile(vaddr.0 as *mut u8, 9)};
-    // assert_eq!(unsafe {core::ptr::read_volatile(vaddr.0 as *const u8)}, 11);
+    map!(0x1000_0000);
 }
 
 // Sv32:

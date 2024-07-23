@@ -82,6 +82,7 @@ impl log::Log for Logger {
 pub fn init() {
     unsafe {
         STDIO_UART.lock().init();
+        // Trace but can be changed using --log-level ... in run.py or any runner script
         #[cfg(debug_assertions)]
         log::set_logger(&_LOGGER).map(|()| log::set_max_level(log::LevelFilter::Trace)).unwrap();
         #[cfg(not(debug_assertions))]

@@ -21,7 +21,7 @@ pub fn close_qemu() {
 pub fn log_err() {
     let sp = regr!("sp")+0x100;
     let stack = unsafe { core::slice::from_raw_parts(sp as *const usize, 100) };
-    dbg!(stack);
+    // dbg!(stack);
     print!("ERR_FROM_ADDR:{}", csrr!("mepc"));
     for val in stack {
         if *val >= 0x8000_0000 && *val <= riscv::stack_start() {

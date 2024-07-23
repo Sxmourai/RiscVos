@@ -130,7 +130,7 @@ extern "C" fn mtrap() {
         match id {
             0 => {println!("Instruction address misaligned: {}", mtval)},
             1 => {println!("Instruction access fault: {}", mtval)},
-            2 => {println!("Illegal instruction: {}", csrr!("mepc"))},
+            2 => {println!("Illegal instruction: {}", csrr!("mepc")); unsafe{csrw!("mepc", csrr!("mepc")+4)}},
             3 => {println!("Breakpoint: {}", mtval)},
             4 => {println!("Load address misaligned: {}", mtval)},
             5 => {println!("Load access fault: {}", mtval)}, // Fail pmp check
