@@ -31,6 +31,7 @@ def create_parser(name="Kernel script", args: List[Tuple[list, dict]]=[]):
     parser.add_argument("--mem-size", default="128M")
     parser.add_argument("--build-args", default="")
     parser.add_argument("--qemu-args", default="")
+    parser.add_argument("-q", "--quiet", action=argparse.BooleanOptionalAction)
     for _args, _kwargs in args:
         parser.add_argument(*_args, **_kwargs)
     return parser
@@ -43,6 +44,7 @@ def parse_args(*args, **kwargs):
 
 import subprocess
 def build_kernel(args: argparse.ArgumentParser):
+    if args.quiet:args.build_args += " -q "
     return subprocess.check_output(_strip_empty_cmd(f"cargo b --profile {args.profile} {args.build_args}"))
 
 def qemu_cmd(args: argparse.ArgumentParser):

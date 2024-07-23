@@ -83,11 +83,9 @@ pub fn init() {
     unsafe {
         STDIO_UART.lock().init();
         #[cfg(debug_assertions)]
-        if let Ok(()) = log::set_logger(&_LOGGER) {
-            log::set_max_level(log::LevelFilter::Debug)
-        }
+        log::set_logger(&_LOGGER).map(|()| log::set_max_level(log::LevelFilter::Debug)).unwrap();
         #[cfg(not(debug_assertions))]
-        log::set_logger(&_LOGGER).map(|()| log::set_max_level(log::LevelFilter::Info));
+        log::set_logger(&_LOGGER).map(|()| log::set_max_level(log::LevelFilter::Info)).unwrap();
     };
 }
 

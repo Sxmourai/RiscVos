@@ -226,7 +226,7 @@ impl core::fmt::Debug for PageTableEntry {
         if self.user_mode_accessible()   {core::fmt::Write::write_char(f, 'U')?}
         if self.global_mapping() {core::fmt::Write::write_char(f, 'G')?}
         let ppn = self.parse_ppn();
-        f.write_fmt(format_args!(" {} {} {}", ppn.ppn0(),ppn.ppn1(),ppn.ppn2()));
+        f.write_fmt(format_args!(" {} {} {}", ppn.ppn0(),ppn.ppn1(),ppn.ppn2()))?;
         Ok(())
     }
 }
@@ -252,7 +252,7 @@ impl PageTable {
             if entry.valid() {
                 f.write_fmt(format_args!("{}{:?}", "\t".repeat(tabs), entry))?;
                 if !entry.is_leaf() {
-                    f.write_str(":\n");
+                    f.write_str(":\n")?;
                     unsafe{entry.get_page_table()}.recurse_dbg(tabs+1, f)?;
                 }
                 f.write_str("\n")?;
@@ -363,7 +363,7 @@ macro_rules! map {
         $crate::map!($vaddr, $crate::heap::kalloc(1).unwrap() as *mut PageTable, $flags)
     };
     ($vaddr: expr, $paddr: expr, flags=$flags: expr) => {
-        $crate::paging::map($vaddr, $paddr, $flags)
+        $crate::paging::map($vaddr, $paddr, $flags).unwrap()
     };
 }
 
@@ -382,8 +382,8 @@ pub fn init() {
     let mut flags = PageTableEntryFlags(0b1111); // XWRV
     flags.set_dirty(true);
     flags.set_accessed(true);
-    map(vaddr, paddr, flags);
-    map(vaddr+PAGE_SIZE64, paddr+PAGE_SIZE64, flags);
+    crate::map!(vaddr, paddr, flags=flags);
+    crate::map!(vaddr+PAGE_SIZE64, paddr+PAGE_SIZE64, flags=flags);
     println!("{:?}", unsafe{get_root_pt()});
     assert_eq!(get_page(vaddr).unwrap().0, PageTableEntry::with_phys_pn(paddr).apply_flags(flags).0);
     unsafe {core::ptr::write_volatile(vaddr.0 as *mut u8, 10)};

@@ -2,7 +2,6 @@
 
 #![cfg_attr(debug_assertions, allow(unused, dead_code))]
 #![warn(unused_must_use)]
-#![cfg_attr(debug_assertions, warn(unused_results))]
 #![warn(static_mut_refs)]
 #![cfg_attr(not(debug_assertions), warn(clippy::unwrap_used))]
 // So that we make sure unsafe code is wrapped into `unsafe` even if the function is marked as unsafe.

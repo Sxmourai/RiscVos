@@ -17,8 +17,6 @@ pub fn close_qemu() {
 }
 
 
-
-
 pub static mut PANIC_CALLBACK: Option<fn()> = None;
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo<'_>) -> ! {
