@@ -35,6 +35,8 @@ pub struct UART {
 impl UART {
     /// # Safety
     /// Caller must ensure the `init` method is called next
+    /// Caller must ensure the address is right and not pointing to random stuff in memory
+    /// which could cause page faults & co
     pub const unsafe fn new(port: u64) -> Self {
         
         Self {

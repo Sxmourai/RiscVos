@@ -28,8 +28,12 @@ pub mod pmp;
 pub mod traps;
 pub mod plic;
 pub mod clint;
-
 pub mod virtio;
+
+
+pub mod thread;
+
+
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo<'_>) -> ! {
