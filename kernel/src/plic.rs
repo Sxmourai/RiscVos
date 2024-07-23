@@ -53,6 +53,7 @@ impl PLIC {
     }
     /// Could return plain value, which would be 0 instead of None
     /// But this option forces us to unwrap the value and process it
+    /// 
     /// Doesn't need mut self, but we are "simulating" the real behavior of the PLIC, 
     /// The PLIC stops listening to other ints when we claim, so we change the state
     pub fn claim_int(&mut self) -> Option<u32> {
@@ -68,6 +69,10 @@ impl PLIC {
 pub fn init() {
     info!("Initialising PLIC...");
     PLIC.enable_interrupt(10); // UART0 interrupt (see qemu source code)
+    for i in 1..=8 { // Virt IO
+        PLIC.enable_interrupt(i);
+        PLIC.set_priority(i, 1);
+    }
     PLIC.set_priority(10, 2);
     PLIC.set_threshold(0);
 }

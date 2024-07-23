@@ -349,6 +349,8 @@ macro_rules! map {
 
 pub fn init() {
     info!("Initialising paging...");// 80000ea0 3cf489c0 8081 0000  4bef18c0
+    unsafe { csrw!("satp", 0) };
+    return;
     let mut satp = riscv::SATP(PagingModes::Sv39.satp());
     let root_page_table_ptr = crate::heap::kalloc(1).unwrap() as *mut PageTable;
     satp.set_ppn((root_page_table_ptr as u64) >> 12); // 2^12=4096

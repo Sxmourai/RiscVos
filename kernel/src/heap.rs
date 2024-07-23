@@ -1,3 +1,5 @@
+use paging::PAGE_SIZE;
+
 use crate::*;
 
 extern "C" {
@@ -108,4 +110,7 @@ pub fn kalloc(page_count: usize) -> Option<*mut Page> {
     unsafe {
         MAIN_HEAP_ALLOCATOR.alloc(page_count)
     }
+}
+pub fn kmalloc(bytes: usize) -> Option<*mut Page> {
+    kalloc(bytes.div_ceil(PAGE_SIZE))
 }

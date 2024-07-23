@@ -113,13 +113,13 @@ extern "C" fn mtrap() {
                 if let Some(int) = PLIC.claim_int() {
                     match int {
                         10 => unsafe{logging::STDIO_UART.handle_int();},
+                        1..=8 => {virtio::handle_int(int)},
                         _ => todo!("Support this interrupt: {} !", int)
                     }
                     PLIC.eoi(int);
                 } else {
                     println!("Spurious interrupt ?!");
                 }
-
             },
             13 => {println!("Counter overflow interrupt")},
             ..16 => {println!("Custom interrupt !")},

@@ -6,10 +6,13 @@ parser.add_argument("--profile", default="dev")
 parser.add_argument("--cpu-count", default="4") # target/riscv64gc-unknown-none-elf/debug/kernel
 parser.add_argument("--mem-size", default="128M")
 parser.add_argument("--build-args", default="")
+parser.add_argument("-q", "--quiet", action=argparse.BooleanOptionalAction)
 parser.add_argument("--qemu-args", default="")
 args = parser.parse_args()
 PROFILE_PATH = args.profile
 if PROFILE_PATH == "dev":PROFILE_PATH = "debug"
+if args.quiet:
+    args.build_args += " -q "
 cmd(f"cargo b --profile {args.profile} {args.build_args}")
 TARGET="riscv64gc-unknown-none-elf"
 TARGET_DIR = "/".join((os.environ.get("CARGO_TARGET_DIR", "target"), TARGET))
@@ -24,10 +27,7 @@ qemu = subprocess.Popen(map(lambda x: x.strip(), filter(lambda w: w.strip() != "
                         -nographic -serial mon:stdio -bios none 
                         -drive if=none,format=raw,file=disk.hdd,id=fat_disk -device virtio-blk-device,scsi=off,drive=fat_disk
                         -kernel {KERNEL_FILE} 
-                        -msg timestamp=on,guest-name=on 
                         {args.qemu_args}""".split(" "))), stdout=subprocess.PIPE)
-print(" ".join(qemu.args))
-print()
 read = ""
 try:
     while True:
@@ -42,9 +42,13 @@ try:
             if qemu.stdin != None:
                 qemu.stdin.close()
             qemu.stdout.close()
-            print(end="\r")
+            # print()
+            # print(end="\r")
+            print("\r"+" "*os.get_terminal_size()[0], end="\r")
             qemu.terminate()
             qemu.wait(1)
+            # Delete qemu termination msg
+            print("\033[1A\r"+" "*os.get_terminal_size()[0], end="\r")
             break
         elif read.endswith("ERR_FROM_ADDR:"): # Pretty error messages from traps.rs
             parsed = qemu.stdout.read(1).decode(errors="ignore")
@@ -85,5 +89,3 @@ finally:
 
 # Erase last FLAG_EO_TESTS print and other qemu stuff
 sys.stdout.flush()
-# print("\033[1A\r"+" "*os.get_terminal_size()[0])
-# print()

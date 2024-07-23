@@ -1,14 +1,19 @@
+use alloc::{string::ToString, vec::{self, Vec}};
 use log::{info, warn};
 
-use crate::{dbg, kalloc, paging::{PAGE_SIZE, PAGE_SIZE64}};
+use crate::{dbg, heap::kmalloc, kalloc, paging::{PAGE_SIZE, PAGE_SIZE64}};
 
 /// QEMU SPECIFIC
 pub const VIRTIO_START: usize = 0x1000_1000;
 pub const VIRTIO_END: usize =   0x1000_8000;
 pub const VIRTIO_STRIDE: usize = 0x1000;
 pub const VIRTIO_MAGIC: u32 = 0x74_72_69_76; // "virt" in little endian
-pub static mut VIRTIO_DEVICES: [Option<alloc::boxed::Box<VirtIODevice>>; (VIRTIO_END-VIRTIO_START)/VIRTIO_STRIDE] = [None; _];
+pub const VIRTIO_COUNT: usize = (VIRTIO_END-VIRTIO_START)/VIRTIO_STRIDE+1;
+pub static mut VIRTIO_DEVICES: [Option<alloc::boxed::Box<dyn VirtIODevice>>; VIRTIO_COUNT] = [const{None}; VIRTIO_COUNT];
 
+pub const VIRTIO_DESC_F_NEXT: u16 = 1;
+pub const VIRTIO_DESC_F_WRITE: u16 = 2;
+pub const VIRTIO_DESC_F_INDIRECT: u16 = 4;
 
 pub fn init() {
     crate::info!("Probing Virtio devices...");
@@ -33,25 +38,44 @@ pub fn init() {
         }
         else {
             let idx = (addr - VIRTIO_START) / VIRTIO_STRIDE;
+            let mut mmio = StandardVirtIO { idx, read_only: false };
+            if init_device(&mut mmio).is_none() {warn!("Failed initialising device {}", deviceid);}
             // https://docs.oasis-open.org/virtio/virtio/v1.1/csprd01/virtio-v1.1-csprd01.html#x1-1930005
+    
             if let Some(device) = match deviceid {
-                2 => {block_device(idx)},
+                2 => {block_device(mmio)},
                 4 => {todo!()},
                 _ => {todo!("support this device: {}", deviceid)},
             } {
-                unsafe { VIRTIO_DEVICES[idx].replace(alloc::boxed::Box::new(device)); }
+                #[allow(unused_results)]
+                let _ = unsafe { VIRTIO_DEVICES[idx].replace(alloc::boxed::Box::new(device)); };
+                // for i in 0..1000000 {}
+                // let mut buf = Vec::with_capacity(512);
+                // unsafe { buf.set_len(buf.capacity()) }
+                // // For debugging only donowori
+                // let mut dev = unsafe {&mut *((VIRTIO_DEVICES[idx].as_mut()).unwrap().as_mut() as *mut dyn VirtIODevice as *mut BlockDevice)};
+                // dev.read(0, &mut buf).unwrap();
+                // for i in 0..1000000 {}
+                // dbg!(buf);
+                // let mut buf = alloc::vec![1u8; 512];
+                // for i in 0..1000000 {}
+                // dev.write(0, &mut buf).unwrap();
+                // for i in 0..1000000 {}
+                // let mut buf2 = Vec::with_capacity(512);
+                // unsafe { buf2.set_len(buf2.capacity()) }
+                // dev.read(0, &mut buf2).unwrap();
+                // for i in 0..1000000 {}
+                // dbg!(buf2);
             }
-
         }
     }
 }
 
-pub fn block_device(idx: usize) -> Option<BlockDevice> {
-    info!("Found block device at {:#x}", idx);
-    
-    None
+pub fn block_device(mmio: StandardVirtIO) -> Option<BlockDevice> {
+    BlockDevice::new(mmio)
 }
 
+#[derive(Debug)]
 pub struct StandardVirtIO {
     pub idx: usize,
     pub read_only: bool, // ! Costs an entire usize because of alignment, we will have to change that ! 
@@ -69,6 +93,7 @@ pub const VIRTIO_RING_SIZE: usize = 1 << 7;
 // specified above. Any descriptor can be chained, hence the
 // next field, but only if the F_NEXT flag is specified.
 #[repr(C)]
+#[derive(Debug)]
 pub struct Descriptor {
 	pub addr:  u64,
 	pub len:   u32,
@@ -83,14 +108,25 @@ pub struct Available {
 	pub ring:  [u16; VIRTIO_RING_SIZE],
 	pub event: u16,
 }
+impl core::fmt::Debug for Available {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Available")
+        .field("flags", &self.flags)
+        .field("idx", &self.idx)
+        .field("ring", &self.ring.iter().map(|x| x.to_string()).collect::<alloc::string::String>())
+        .field("event", &self.event).finish()
+    }
+}
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct UsedElem {
 	pub id:  u32,
 	pub len: u32,
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct Used {
 	pub flags: u16,
 	pub idx:   u16,
@@ -104,18 +140,33 @@ pub struct Queue {
 	pub avail: Available,
 	// Calculating padding, we need the used ring to start on a page boundary. We take the page size, subtract the
 	// amount the descriptor ring takes then subtract the available structure and ring.
-	pub padding0: [u8; PAGE_SIZE - size_of::<Descriptor>() * VIRTIO_RING_SIZE - size_of::<Available>()],
+	pub padding0: [u8; PAGE_SIZE - (size_of::<Descriptor>() * VIRTIO_RING_SIZE + size_of::<Available>())],
 	pub used:     Used,
 }
+impl core::fmt::Debug for Queue {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Queue")
+        .field("desc", &format_args!("{:?}", self.desc.iter().filter(|x| x.addr != 0).collect::<Vec<&Descriptor>>()))
+        .field("avail", &self.avail)
+        // .field("padding0", &self.padding0)
+        .field("used", &self.used)
+        .finish()
+    }
+}
+#[derive(Debug)]
 pub struct BlockDevice {
     mmio: StandardVirtIO,
     queue: Option<*mut Queue>,
+    queue_idx: usize,
+    pendings: Vec<&'static [u8]>, // Not static, but gonna change it, but lifetime is not the right move for now
 }
 impl BlockDevice {
     pub fn new(mmio: StandardVirtIO) -> Option<Self> {
         let mut _s = Self {
             mmio,
             queue: None,
+            queue_idx: 0,
+            pendings: Vec::new(),
         };
         _s.specific_init()?;
         Some(_s)
@@ -136,32 +187,110 @@ impl BlockDevice {
         // divide to truncate the decimal. We don't add 4096,
         // because if it is exactly 4096 bytes, we would get two
         // pages, not one.
-        let num_pages = (size_of::<Queue>() + PAGE_SIZE - 1) / PAGE_SIZE;
+        let num_pages = size_of::<Queue>().div_ceil(PAGE_SIZE);
         // Allocate 1 page for every device, but we will still be using the MMIO registers
         // ! Don't forget to use memory fences, cuz we need to have finished writing to memory before issuing a notify 
-        dbg!(num_pages);
         unsafe { self.mmio.write(MmioOffset::QueueSel, 0) };
 
         //TODO Alignment
-        let self.queue = kalloc(1) as *mut Queue;
+        let _ = self.queue.replace(kalloc(1)? as *mut Queue);
         unsafe { self.mmio.write(MmioOffset::GuestPageSize, PAGE_SIZE.try_into().unwrap()) };
         // QueuePFN is a physical page number, however it
         // appears for QEMU we have to write the entire memory
         // address.
         unsafe {
-            self.mmio.write(MmioOffset::QueuePfn, (queue as u64 / PAGE_SIZE64) as u32);
-            self.mmio.write(MmioOffset::Status, self.mmio.read(MmioOffset::Status) | StatusField::DriverOk);
+            self.mmio.write(MmioOffset::QueuePfn, (self.queue.unwrap_unchecked() as u64 / PAGE_SIZE64) as u32);
+            self.mmio.write(MmioOffset::Status, StatusField::DriverOk | self.mmio.read(MmioOffset::Status));
         }
         Some(())
     }
-    fn op<T: Sized>(&mut self, sector_offset: usize, write: bool) -> Option<alloc::vec::Vec<T>> {
-        if self.mmio.read_only && write {return None;}
+    fn op(&mut self, sector_offset: u64, buffer: &[u8], writing: bool) -> Option<()> {
+        assert_eq!(buffer.len()%512, 0);
+        if self.mmio.read_only && writing {return None;}
+        let request = unsafe{&mut *(kmalloc(core::mem::size_of::<Request>())? as *mut Request)};
+        let desc = Descriptor {
+            addr: unsafe { &(*request).header } as *const Header as u64, // Isn't it zero ?
+            len:  core::mem::size_of::<Header>() as _,
+            flags:VIRTIO_DESC_F_NEXT,
+            next: 0,
+        };
+        unsafe {
+            self.fill_next_descriptor(desc)?;
+        }
+        request.header.sector = sector_offset;
+        request.header.blktype = if writing {VIRTIO_BLK_T_OUT} else {VIRTIO_BLK_T_IN};
+        request.header.reserved = 0;
         
-        Some(buffer)
+        request.data = buffer[0] as *mut _;
+        // We put 111 in the status. Whenever the device finishes, it will write into
+        // status. If we read status and it is 111, we know that it wasn't written to by
+        // the device.
+        request.status = 111; // Not 0b111 but One hundred and one !
+        let head_idx = self.queue_idx.clone();
+
+        let mut flags = VIRTIO_DESC_F_NEXT;
+        if writing {
+            flags |= VIRTIO_DESC_F_WRITE
+        }
+        let data_desc = Descriptor { 
+            addr: (buffer[0] as *mut u8) as u64,
+            len:buffer.len() as u32,
+            flags,
+            next: 0, 
+        };
+        unsafe {self.fill_next_descriptor(data_desc)}?;
+        let data_idx = self.queue_idx.clone();
+        let status_desc = Descriptor {
+            addr:  unsafe { &(*request).status } as *const u8 as u64,
+            len:   1,
+            flags: VIRTIO_DESC_F_WRITE,
+            next:  0, 
+        };
+        unsafe {self.fill_next_descriptor(status_desc)}?;
+        let status_idx = self.queue_idx.clone();
+        let queue = unsafe{&mut *self.queue?};
+        queue.avail.ring[queue.avail.idx as usize] = head_idx as u16;
+        queue.avail.idx = (((queue.avail.idx as usize) + 1) % VIRTIO_RING_SIZE) as _;
+        dbg!(queue);
+        // The only queue a block device has is 0, which is the request
+        // queue.
+        unsafe {self.mmio.write(MmioOffset::QueueNotify, 0);}
+
+        Some(())
+    }
+    unsafe fn fill_next_descriptor(&mut self, desc: Descriptor) -> Option<()> {
+		// The ring structure increments here first. This allows us to skip
+		// index 0, which then in the used ring will show that .id > 0. This
+		// is one way to error check. We will eventually get back to 0 as
+		// this index is cyclical. However, it shows if the first read/write
+		// actually works.
+        let queue = unsafe{&mut *self.queue?};
+        self.queue_idx = (self.queue_idx + 1) % VIRTIO_RING_SIZE;
+        queue.desc[self.queue_idx as usize] = desc;
+        if queue.desc[self.queue_idx as usize].flags & VIRTIO_DESC_F_NEXT != 0 {
+            // If the next flag is set, we need another descriptor.
+            queue.desc[self.queue_idx as usize].next = ((self.queue_idx + 1) % VIRTIO_RING_SIZE) as _;
+        }
+        Some(())
+    }
+    /// Reads size in bytes and returns a vector of the values as T
+    pub fn read(&mut self, sector_offset: u64, buffer: &mut Vec<u8>) -> Option<()> {
+        self.op(sector_offset, buffer, false)?;
+        Some(())
+    }
+    
+    pub fn write(&mut self, sector_offset: u64, buffer: &Vec<u8>) -> Option<()> {
+        self.op(sector_offset, buffer, true)?;
+        Some(())
     }
 }
 impl VirtIODevice for BlockDevice {
-
+    fn handle_int(&mut self) {
+        dbg!(self);
+        dbg!(self.queue_idx, self.queue);
+        let queue = unsafe{&mut *(self.queue.unwrap())};
+        dbg!(queue);
+    }
 }
 #[repr(C)]
 pub struct Geometry {
@@ -291,7 +420,7 @@ impl StandardVirtIO {
 }
 
 pub trait VirtIODevice {
-    
+    fn handle_int(&mut self);
 }
 
 pub enum MmioOffset {
@@ -343,14 +472,27 @@ pub enum StatusField {
     DeviceNeedsReset = 1<<6,
     Failed           = 1<<7,
 }
-impl core::ops::BitOr for StatusField {
+impl core::ops::BitOr<Self> for StatusField {
     type Output = u32;
     fn bitor(self, rhs: Self) -> Self::Output {
+        self as Self::Output | rhs as Self::Output
+    }
+}
+impl core::ops::BitOr<u32> for StatusField {
+    type Output = u32;
+    fn bitor(self, rhs: u32) -> Self::Output {
         self as Self::Output | rhs as Self::Output
     }
 }
 impl core::ops::BitOrAssign<StatusField> for u32 {
     fn bitor_assign(&mut self, rhs: StatusField) {
         *self |= rhs as Self
+    }
+}
+pub fn handle_int(int: u32) {
+    let idx = int-1;
+    unsafe {
+        let boxed_dev = VIRTIO_DEVICES[idx as usize].as_mut().expect("Should be set if we get an interrupt from there ?");
+        boxed_dev.handle_int();
     }
 }
