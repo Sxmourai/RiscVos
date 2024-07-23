@@ -103,8 +103,8 @@ bitfield! {
 }
 impl Sv39VirtualAddress {
     pub fn new(addr: u64) -> Self {
-        let mut _s = Self(addr);
-        _s
+        
+        Self(addr)
     }
     pub fn vpn(self, vpni: u64) -> u64 {
         assert!(vpni <= 3);
@@ -200,6 +200,8 @@ impl PageTableEntry {
     pub fn apply_flags(self, flags: PageTableEntryFlags) -> Self {
         Self(self.0 | flags.0)
     }
+    /// # Safety
+    /// Caller must ensure that the entry is valid and the address is also valid
     pub unsafe fn get_page_table(self) -> &'static PageTable {
         let addr = self.parse_ppn();
         unsafe{&*(addr.0 as *mut _)}
@@ -231,6 +233,12 @@ impl core::fmt::Debug for PageTableEntry {
 #[repr(C)]
 pub struct PageTable {
     pub entries: [PageTableEntry; 512],
+}
+
+impl Default for PageTable {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PageTable {
@@ -270,22 +278,25 @@ impl core::fmt::Debug for PageTable {
     }
 }
 
-pub unsafe fn get_root_pt() -> &'static mut PageTable {
+pub fn get_root_pt() -> Result<&'static mut PageTable, PagingError> {
     let satp = SATP::read();
-    if satp.mode() == 0 {warn!("Trying to get page table but mode is BARE !");}
+    if satp.mode() == 0 {
+        warn!("Trying to get page table but mode is BARE !");
+    }
     let addr = satp.ppn()<<12;
-    unsafe{&mut *(addr as *mut _)}
+    if addr == 0 {return Err(PagingError::InvalidPageTable);}
+    Ok(unsafe{&mut *(addr as *mut _)})
 }
 /// Automatically gets root page table, and page-level
 /// Not unsafe for convenience, just know that any call to this function is unsafe
 /// Return: result
 /// # Safety
 /// Ultimate memory breaker, could write to different virtual addresses but be on same physical etc...
-pub fn map(vaddr: Sv39VirtualAddress, paddr: Sv39PhysicalAddress, flags: PageTableEntryFlags) {
+pub fn map(vaddr: Sv39VirtualAddress, paddr: Sv39PhysicalAddress, flags: PageTableEntryFlags) -> Result<&'static mut PageTableEntry, PagingError> {
     assert!(PageTableEntry(flags.0).is_leaf());
     let mut level = 3;
     dbg!();
-    let mut current_page_table = unsafe{get_root_pt()};
+    let mut current_page_table = get_root_pt()?;
     let leaf_pte = loop {
         if level == 0 {
             panic!("Not found ?")
@@ -297,22 +308,31 @@ pub fn map(vaddr: Sv39VirtualAddress, paddr: Sv39PhysicalAddress, flags: PageTab
         // original access type
         if !pte.valid() {
             *pte = PageTableEntry::with_phys_pn(Sv39PhysicalAddress(kalloc(1).unwrap() as u64));
-            println!("WARN: Level: {}, Writing new entry at idx {}, pointing to: {:x}", level, vaddr.vpn(level), pte.parse_ppn().0);
+            trace!("Level: {}, Writing new entry at idx {}, pointing to: {:x}", level, vaddr.vpn(level), pte.parse_ppn().0);
             pte.set_valid(true);
             if level == 0 {break pte;}
         }
-        else if !pte.readable() && pte.writable() {panic!("Invalid state entry !")}
+        else if !pte.readable() && pte.writable() {
+            warn!("Invalid state entry !");
+            return Err(PagingError::InvalidEntry(pte.clone()))
+        }
         else if pte.is_leaf() {
             break pte;
         }
         current_page_table = unsafe{&mut *(pte.parse_ppn().0 as *mut PageTable)};
     };
     *leaf_pte = PageTableEntry::with_phys_pn(paddr).apply_flags(flags);
+    Ok(leaf_pte)
+}
+#[derive(Debug)]
+pub enum PagingError {
+    InvalidPageTable,
+    InvalidEntry(PageTableEntry)
 }
 
-pub fn get_page(vaddr: Sv39VirtualAddress) -> Option<&'static PageTableEntry> {
+pub fn get_page(vaddr: Sv39VirtualAddress) -> Result<&'static PageTableEntry, PagingError> {
     let mut level = 3;
-    let mut current_page_table = unsafe{&*get_root_pt()};
+    let mut current_page_table = &*get_root_pt()?;
     let leaf_pte = loop {
         if level == 0 {
             panic!("Not found ?")
@@ -320,7 +340,7 @@ pub fn get_page(vaddr: Sv39VirtualAddress) -> Option<&'static PageTableEntry> {
         level -= 1;
         let mut pte = &current_page_table.entries[vaddr.vpn(level) as usize];
         if !pte.valid() {
-            return None; // TODO: Return result
+            return Err(PagingError::InvalidEntry(pte.clone()));
         }
         else if !pte.readable() && pte.writable() {panic!("Invalid state entry !")}
         else if pte.is_leaf() {
@@ -328,7 +348,7 @@ pub fn get_page(vaddr: Sv39VirtualAddress) -> Option<&'static PageTableEntry> {
         }
         current_page_table = unsafe{&*(pte.parse_ppn().0 as *const PageTable)};
     };
-    Some(&leaf_pte)
+    Ok(leaf_pte)
 }
 
 #[macro_export]

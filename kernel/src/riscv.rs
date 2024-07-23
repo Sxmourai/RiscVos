@@ -157,15 +157,6 @@ pub fn get_mode() -> PrivilegeLevel {
     }
 }
 
-pub unsafe fn assert_mstatus() {
-    let mstatus = csrr!("mstatus");
-    unsafe { enter_mode(PrivilegeLevel::Machine) }
-    if mstatus != csrr!("mstatus") {
-        dbg!(MSTATUS::read());
-    }
-} 
-
-
 pub fn spin_loop() -> ! {
     loop {wfi()}
 }

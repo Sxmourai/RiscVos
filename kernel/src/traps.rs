@@ -112,13 +112,13 @@ extern "C" fn mtrap() {
                 use plic::PLIC;
                 if let Some(int) = PLIC.claim_int() {
                     match int {
-                        10 => unsafe{logging::STDIO_UART.handle_int();},
+                        10 => logging::handle_int(),
                         1..=8 => {virtio::handle_int(int)},
                         _ => todo!("Support this interrupt: {} !", int)
                     }
-                    PLIC.eoi(int);
+                    unsafe { PLIC.eoi(int) };
                 } else {
-                    println!("Spurious interrupt ?!");
+                    warn!("Spurious interrupt ?!");
                 }
             },
             13 => {println!("Counter overflow interrupt")},
@@ -203,8 +203,8 @@ extern "C" fn strap() {
 }
 
 extern "C" {
-    pub fn s_trap_vector() -> ();
-    pub fn m_trap_vector() -> ();
+    pub fn s_trap_vector();
+    pub fn m_trap_vector();
 }
 #[no_mangle]
 pub extern "C" fn abort() {
@@ -380,7 +380,7 @@ mret
 ");
 
 
-pub fn init(callback: u64) {
+pub fn init(callback: usize) {
     info!("Initialising traps...");
     // PMP seems cool too
     let mut supervisor_mstatus = riscv::MSTATUS(PrivilegeLevel::supervisor());
@@ -398,12 +398,12 @@ pub fn init(callback: u64) {
         // Delegate all interrupts to supervisor mode (so that we only have 1 interrupt handler)
         // csrw!("medeleg", 0xffff);
         // csrw!("mideleg", 0xffff);
-        csrw!("mtvec", m_trap_vector as u64 & !(0b11));
+        csrw!("mtvec", m_trap_vector as usize & !(0b11));
         // use Interrupts as Int;(Int::SupervisorTimer as u64) | (Int::SupervisorSoftware as u64) | (Int::SupervisorExternal as u64) |
         // (Int::MachineTimer as u64) | (Int::MachineSoftware as u64) | (Int::MachineExternal as u64)
         csrw!("mie", 0xFFFF);
         csrw!("sie", 0xFFFF);
-        csrw!("stvec", s_trap_vector as u64 & !(0b11));
+        csrw!("stvec", s_trap_vector as usize & !(0b11));
         csrw!("mepc", callback);
         core::arch::asm!("
         // csrw mepc, 

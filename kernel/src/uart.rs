@@ -77,7 +77,7 @@ impl UART {
     }
     pub fn get_int(&self) -> Option<UARTInts> {
         let int_ident = unsafe{(self.base_port as *const u8).add(2).read_volatile()};
-        if int_ident.get_bit(0)==true {return None;} // Should be 0 (or false) if interrupt is pending
+        if int_ident.get_bit(0) {return None;} // Should be 0 (or false) if interrupt is pending
         UARTInts::parse((int_ident)&0b111)
     }
     pub fn handle_int(&self, ) {

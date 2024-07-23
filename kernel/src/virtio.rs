@@ -48,7 +48,7 @@ pub fn init() {
                 _ => {todo!("support this device: {}", deviceid)},
             } {
                 #[allow(unused_results)]
-                let _ = unsafe { VIRTIO_DEVICES[idx].replace(alloc::boxed::Box::new(device)); };
+                unsafe { VIRTIO_DEVICES[idx].replace(alloc::boxed::Box::new(device)); };
                 // for i in 0..1000000 {}
                 // let mut buf = Vec::with_capacity(512);
                 // unsafe { buf.set_len(buf.capacity()) }
@@ -209,7 +209,7 @@ impl BlockDevice {
         if self.mmio.read_only && writing {return None;}
         let request = unsafe{&mut *(kmalloc(core::mem::size_of::<Request>())? as *mut Request)};
         let desc = Descriptor {
-            addr: unsafe { &(*request).header } as *const Header as u64, // Isn't it zero ?
+            addr: unsafe { &request.header } as *const Header as u64, // Isn't it zero ?
             len:  core::mem::size_of::<Header>() as _,
             flags:VIRTIO_DESC_F_NEXT,
             next: 0,
@@ -226,7 +226,7 @@ impl BlockDevice {
         // status. If we read status and it is 111, we know that it wasn't written to by
         // the device.
         request.status = 111; // Not 0b111 but One hundred and one !
-        let head_idx = self.queue_idx.clone();
+        let head_idx = self.queue_idx;
 
         let mut flags = VIRTIO_DESC_F_NEXT;
         if writing {
@@ -239,15 +239,15 @@ impl BlockDevice {
             next: 0, 
         };
         unsafe {self.fill_next_descriptor(data_desc)}?;
-        let data_idx = self.queue_idx.clone();
+        let data_idx = self.queue_idx;
         let status_desc = Descriptor {
-            addr:  unsafe { &(*request).status } as *const u8 as u64,
+            addr:  unsafe { &request.status } as *const u8 as u64,
             len:   1,
             flags: VIRTIO_DESC_F_WRITE,
             next:  0, 
         };
         unsafe {self.fill_next_descriptor(status_desc)}?;
-        let status_idx = self.queue_idx.clone();
+        let status_idx = self.queue_idx;
         let queue = unsafe{&mut *self.queue?};
         queue.avail.ring[queue.avail.idx as usize] = head_idx as u16;
         queue.avail.idx = (((queue.avail.idx as usize) + 1) % VIRTIO_RING_SIZE) as _;
@@ -266,20 +266,20 @@ impl BlockDevice {
 		// actually works.
         let queue = unsafe{&mut *self.queue?};
         self.queue_idx = (self.queue_idx + 1) % VIRTIO_RING_SIZE;
-        queue.desc[self.queue_idx as usize] = desc;
-        if queue.desc[self.queue_idx as usize].flags & VIRTIO_DESC_F_NEXT != 0 {
+        queue.desc[self.queue_idx] = desc;
+        if queue.desc[self.queue_idx].flags & VIRTIO_DESC_F_NEXT != 0 {
             // If the next flag is set, we need another descriptor.
-            queue.desc[self.queue_idx as usize].next = ((self.queue_idx + 1) % VIRTIO_RING_SIZE) as _;
+            queue.desc[self.queue_idx].next = ((self.queue_idx + 1) % VIRTIO_RING_SIZE) as _;
         }
         Some(())
     }
     /// Reads size in bytes and returns a vector of the values as T
-    pub fn read(&mut self, sector_offset: u64, buffer: &mut Vec<u8>) -> Option<()> {
+    pub fn read(&mut self, sector_offset: u64, buffer: &mut [u8]) -> Option<()> {
         self.op(sector_offset, buffer, false)?;
         Some(())
     }
     
-    pub fn write(&mut self, sector_offset: u64, buffer: &Vec<u8>) -> Option<()> {
+    pub fn write(&mut self, sector_offset: u64, buffer: &[u8]) -> Option<()> {
         self.op(sector_offset, buffer, true)?;
         Some(())
     }

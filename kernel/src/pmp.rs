@@ -75,7 +75,7 @@ macro_rules! pmpaddr_w {
 }
 
 fn get_pmp_i_cfg(pmpcfgi: usize, i: usize) -> usize {
-    return pmpcfgi & (0xFF<<(i*8))
+    pmpcfgi & (0xFF<<(i*8))
 }
 
 pub fn init() {

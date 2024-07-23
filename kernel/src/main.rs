@@ -11,7 +11,7 @@ extern "C" fn kinit() {
     #[cfg(feature = "testing")]
     kernel::tests::test_all();
     kernel::pmp::init(); // Needed by QEMU for mret, see https://stackoverflow.com/questions/69133848/risc-v-illegal-instruction-exception-when-switching-to-supervisor-mode
-    kernel::traps::init(kmain as u64);
+    kernel::traps::init(kmain as _);
     unreachable!()
 }
 

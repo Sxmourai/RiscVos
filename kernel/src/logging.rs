@@ -14,7 +14,7 @@ macro_rules! dbg {
 #[macro_export]
 macro_rules! dbg_bits_reg {
     ($reg: expr) => {{
-        crate::println!("{}: {:b}", stringify!($reg), crate::csrr!($reg));
+        $crate::println!("{}: {:b}", stringify!($reg), $crate::csrr!($reg));
     }};
 }
 #[macro_export]
@@ -87,10 +87,13 @@ pub fn init() {
         STDIO_UART.init();
         #[allow(static_mut_refs)] // I think deprecated in 2024 version
         #[cfg(debug_assertions)]
-        log::set_logger(&STDIO_UART)
-            .map(|()| log::set_max_level(log::LevelFilter::Debug));
+        if let Ok(()) = log::set_logger(&STDIO_UART) { log::set_max_level(log::LevelFilter::Debug) }
         #[cfg(not(debug_assertions))]
         log::set_logger(&STDIO_UART)
             .map(|()| log::set_max_level(log::LevelFilter::Info));
     };
+}
+
+pub fn handle_int() {
+    unsafe { STDIO_UART.handle_int() }
 }

@@ -23,7 +23,7 @@ impl CLINTRegs {
 /// Or if you want is in the repo (SiFive e31 Manual)
 pub struct CLINT;
 impl CLINT {
-    pub unsafe fn write<T>(&mut self, base: CLINTRegs, offset: usize, value: T) {
+    pub fn write<T>(&mut self, base: CLINTRegs, offset: usize, value: T) {
         unsafe {*(base.addr::<T>()).byte_add(offset) = value}
     }
     pub fn read<T: Copy>(&self, base: CLINTRegs, offset: usize) -> T {
@@ -60,7 +60,7 @@ impl CLINT {
 
 
 /// Initialises the machine timer,
-/// Basically, we make it do an interrupt once, and then we re set it everytime in the interrupt handler
+/// Basically, we make it trigger an interrupt once, and then we re-trigger an interrupt for every interrupt
 pub fn init() {
     handle_int()
 }
