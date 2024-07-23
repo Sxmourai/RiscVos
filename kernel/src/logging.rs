@@ -83,7 +83,7 @@ pub fn init() {
     unsafe {
         STDIO_UART.lock().init();
         #[cfg(debug_assertions)]
-        log::set_logger(&_LOGGER).map(|()| log::set_max_level(log::LevelFilter::Debug)).unwrap();
+        log::set_logger(&_LOGGER).map(|()| log::set_max_level(log::LevelFilter::Trace)).unwrap();
         #[cfg(not(debug_assertions))]
         log::set_logger(&_LOGGER).map(|()| log::set_max_level(log::LevelFilter::Info)).unwrap();
     };

@@ -1,7 +1,7 @@
 use alloc::{string::ToString, vec::{self, Vec}};
 use log::{info, warn};
 
-use crate::{dbg, heap::kmalloc, kalloc, paging::{PAGE_SIZE, PAGE_SIZE64}};
+use crate::{*, paging::{PAGE_SIZE, PAGE_SIZE64}};
 
 /// QEMU SPECIFIC
 pub const VIRTIO_START: usize = 0x1000_1000;
@@ -18,6 +18,7 @@ pub const VIRTIO_DESC_F_INDIRECT: u16 = 4;
 pub fn init() {
     crate::info!("Probing Virtio devices...");
     for addr in (VIRTIO_START..=VIRTIO_END).step_by(VIRTIO_STRIDE) {
+        map!(addr);
         crate::trace!("Virtio probing 0x{:08x}...", addr);
         let magicvalue;
         let deviceid;

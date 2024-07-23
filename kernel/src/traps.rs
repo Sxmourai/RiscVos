@@ -133,30 +133,21 @@ extern "C" fn mtrap() {
             2 => {println!("Illegal instruction: {}", csrr!("mepc"))},
             3 => {println!("Breakpoint: {}", mtval)},
             4 => {println!("Load address misaligned: {}", mtval)},
-            5 => {println!("Load access fault: {}", mtval)},
+            5 => {println!("Load access fault: {}", mtval)}, // Fail pmp check
             6 => {println!("Store/AMO address misaligned: {}", mtval)},
             7 => {println!("Store/AMO access fault: {}", mtval)},
             8 => {println!("Environment call from U-mode: {}", mtval)},
             9 => {println!("Environment call from S-mode: {}", mtval)},
             11 => {println!("Environment call from M-mode: {}", mtval)},
             12 => {println!("Instruction page fault: {}", mtval)},
-            13 => {println!("Load page fault: {}", mtval)},
+            13 => {println!("Load page fault: {}", mtval);unsafe{map!(mtval, mtval)};panic!()}, // Fail page check
             15 => {println!("Store/AMO page fault: {}", mtval)},
             18 => {println!("Software check: {}", mtval)},
             19 => {println!("Hardware error: {}", mtval)},
             _ => {dbg!(cause, mtval);},
         }
-        let sp = regr!("sp")+0x100;
-        let stack = unsafe { core::slice::from_raw_parts(sp as *const u64, 100) };
-        dbg!(stack);
-        print!("ERR_FROM_ADDR:{}", csrr!("mepc"));
-        for val in stack {
-            if *val >= 0x8000_0000 && *val <= riscv::stack_start() {
-                print!(",{}", val);
-            }
-        }
-        println!("");
-        panic!()
+        tests::log_err()
+        
     }
 }
 

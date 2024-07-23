@@ -1,12 +1,7 @@
 use paging::PAGE_SIZE;
 
 use crate::*;
-
-extern "C" {
-    static _heap_start: usize;
-    static _heap_size: usize;
-}
-
+use crate::riscv::*;
 pub struct HeapAllocator {
     heap_start: usize,
     heap_size: usize,
@@ -16,9 +11,13 @@ impl HeapAllocator {
     pub fn pages(&self, ) -> HeapPageIterator<'_> {
         HeapPageIterator::new(self)
     }
+    pub fn idx(&self) -> usize {
+        *self.idx.lock()
+    }
+    #[track_caller]
     pub fn alloc(&self, page_count: usize) -> Option<*mut Page> {
         assert!(page_count>0);
-        assert!(self.heap_size>page_count);
+        assert!(page_count+self.idx()<self.heap_size/PAGE_SIZE);
         'pages: for (i,page_ptr) in self.pages().enumerate() {
             let page = unsafe {&*page_ptr}; // It's safe because we assume that our page iterator is yielding safe pages
             if page.is_zeroes() {
@@ -44,6 +43,7 @@ impl HeapAllocator {
 }
 
 unsafe impl core::alloc::GlobalAlloc for HeapAllocator {
+    #[track_caller]
     unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
         let ptr = Self::alloc(self, layout.size().div_ceil(4096)).unwrap();
         // let alignment = layout.align();
@@ -51,6 +51,7 @@ unsafe impl core::alloc::GlobalAlloc for HeapAllocator {
         ptr as _
     }
 
+    #[track_caller]
     unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) {
         // println!("WARNING: Deallocation is not implemented !");
     }
@@ -97,11 +98,9 @@ pub static mut MAIN_HEAP_ALLOCATOR: HeapAllocator = HeapAllocator {heap_start:0,
 pub fn init() {
     info!("Initialising heap...");
     // Idk why, it should be the value, but the value is 0 and the address is the value...
-    let heap_start = unsafe{core::ptr::addr_of!(_heap_start) as usize};
-    let heap_size = unsafe{core::ptr::addr_of!(_heap_size) as usize};
-    unsafe{MAIN_HEAP_ALLOCATOR.heap_start = heap_start-(heap_start%4096)+4096};
-    unsafe{MAIN_HEAP_ALLOCATOR.heap_size = heap_size};
-    assert!(heap_size>1_000_000, "Don't have enough memory !");
+    unsafe{MAIN_HEAP_ALLOCATOR.heap_start = heap_start()-(heap_start()%4096)+4096};
+    unsafe{MAIN_HEAP_ALLOCATOR.heap_size = heap_size()};
+    assert!(heap_size()>1_000_000, "Don't have enough memory !");
     assert_eq!(unsafe{MAIN_HEAP_ALLOCATOR.heap_start%4096}, 0);
     // We now have Vecs & others ! 
 }

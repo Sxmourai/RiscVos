@@ -45,7 +45,10 @@ def parse_args(*args, **kwargs):
 import subprocess
 def build_kernel(args: argparse.ArgumentParser):
     if args.quiet:args.build_args += " -q "
-    return subprocess.check_output(_strip_empty_cmd(f"cargo b --profile {args.profile} {args.build_args}"))
+    try:
+        output = subprocess.check_output(_strip_empty_cmd(f"cargo b --profile {args.profile} {args.build_args}"))
+    except subprocess.CalledProcessError:return None
+    return output
 
 def qemu_cmd(args: argparse.ArgumentParser):
     return subprocess.Popen(_strip_empty_cmd(f"""qemu-system-riscv64 
@@ -97,7 +100,7 @@ def handle_qemu_output(qemu: subprocess.Popen):
                 fnames = []
                 paths = []
                 for addr in addrs:
-                    fname,path = subprocess.check_output(f"riscv64-unknown-elf-addr2line -e {KERNEL_FILE} -f 0x{int(addr):x}".split(" ")).decode(errors='ignore').splitlines()
+                    fname,path = subprocess.check_output(f"riscv64-unknown-elf-addr2line -e {config().kernel_file()} -f 0x{int(addr):x}".split(" ")).decode(errors='ignore').splitlines()
                     fnames.append(fname)
                     paths.append(path)
                 with open("target/mangled.txt", "w") as f:

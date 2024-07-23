@@ -162,14 +162,27 @@ pub fn spin_loop() -> ! {
 }
 
 extern "C" {
-    static _stack_start: u64;
-    static _stack_end: u64;
+    static _stack_start: usize;
+    static _stack_end: usize;
+    static _memory_start: usize;
+    
+    static _heap_start: usize;
+    static _heap_size: usize;    
 }
-pub fn stack_start() -> u64 {
+pub fn stack_start() -> usize {
     unsafe{core::ptr::addr_of!(_stack_start) as _}
 }
-pub fn stack_end() -> u64 {
+pub fn stack_end() -> usize {
     unsafe{core::ptr::addr_of!(_stack_end) as _}
+}
+pub fn heap_start() -> usize {
+    unsafe{core::ptr::addr_of!(_heap_start) as _}
+}
+pub fn heap_size() -> usize {
+    unsafe{core::ptr::addr_of!(_heap_size) as _}
+}
+pub fn memory_start() -> usize {
+    unsafe{core::ptr::addr_of!(_memory_start) as _}
 }
 
 pub fn read_sp() -> u64 {

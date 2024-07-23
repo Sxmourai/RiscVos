@@ -15,13 +15,14 @@ extern crate alloc;
 pub use log::{trace,debug,info,warn,error};
 
 pub mod riscv;
+pub use riscv::*;
 pub mod tests;
 
 pub mod uart;
 pub mod logging;
 
 pub mod heap;
-pub use heap::kalloc;
+pub use heap::{kalloc,kmalloc};
 pub mod paging;
 pub mod pmp;
 

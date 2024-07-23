@@ -1,3 +1,5 @@
+use heap::MAIN_HEAP_ALLOCATOR;
+
 use crate::*;
 
 #[cfg(feature="testing")]
@@ -16,6 +18,21 @@ pub fn close_qemu() {
     crate::print!("FLAG_EO_TESTS"); // Interpreted in run.py and test.py to close qemu
 }
 
+pub fn log_err() {
+    let sp = regr!("sp")+0x100;
+    let stack = unsafe { core::slice::from_raw_parts(sp as *const usize, 100) };
+    dbg!(stack);
+    print!("ERR_FROM_ADDR:{}", csrr!("mepc"));
+    for val in stack {
+        if *val >= 0x8000_0000 && *val <= riscv::stack_start() {
+            print!(",{}", val);
+        }
+    }
+    println!("");
+    
+    dbg!(unsafe { MAIN_HEAP_ALLOCATOR.idx() });
+}
+
 
 pub static mut PANIC_CALLBACK: Option<fn()> = None;
 #[panic_handler]
@@ -29,6 +46,7 @@ fn panic(info: &core::panic::PanicInfo<'_>) -> ! {
     } else {
         crate::println!("{}", alloc::string::ToString::to_string(&info.message()));
     }
+    log_err();
     unsafe {
         if let Some(f) = PANIC_CALLBACK {
             log::warn!("Calling callback at {:?}", f);
