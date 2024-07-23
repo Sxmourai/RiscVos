@@ -382,15 +382,11 @@ mret
 
 pub fn init(callback: usize) {
     info!("Initialising traps...");
-    // PMP seems cool too
     let mut supervisor_mstatus = riscv::MSTATUS(PrivilegeLevel::supervisor());
     supervisor_mstatus.set_mpie(true); // I think mpie should be set anyway, because we can't have spie and not mpie (see ISA / doc)
     supervisor_mstatus.set_spie(true);
-    // dbg_bits!(supervisor_mstatus.0);
     supervisor_mstatus.set_mie(true);
     supervisor_mstatus.set_sie(true);
-    // pmpaddr0::write(0x3fffffffffffff);
-    // pmpcfg0::set_pmp(0, Range::TOR, Permission::RWX, false); // 0 < addr < pmpaddr0
 
     unsafe{
         csrw!("mstatus", supervisor_mstatus.0);

@@ -8,8 +8,6 @@ core::arch::global_asm!(include_str!("boot.s"));
 extern "C" fn kinit() {
     kernel::logging::init();
     kernel::heap::init();
-    #[cfg(feature = "testing")]
-    kernel::tests::test_all();
     kernel::pmp::init(); // Needed by QEMU for mret, see https://stackoverflow.com/questions/69133848/risc-v-illegal-instruction-exception-when-switching-to-supervisor-mode
     kernel::traps::init(kmain as _);
     unreachable!()

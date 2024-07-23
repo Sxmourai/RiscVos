@@ -1,6 +1,7 @@
 #![no_std]
 
 #![cfg_attr(debug_assertions, allow(unused, dead_code))]
+#![warn(unused_must_use)]
 #![cfg_attr(debug_assertions, warn(unused_results))]
 #![warn(static_mut_refs)]
 #![cfg_attr(not(debug_assertions), warn(clippy::unwrap_used))]
@@ -32,20 +33,3 @@ pub mod virtio;
 
 
 pub mod thread;
-
-
-
-#[panic_handler]
-fn panic(info: &core::panic::PanicInfo<'_>) -> ! {
-    print!("PANIC: ");
-    if let Some(loc) = info.location() {
-        print!("at {}:{}:{} ", loc.file(), loc.line(), loc.column());
-    };
-    if let Some(msg) = info.message().as_str() {
-        println!("{}", msg);
-    } else {
-        println!("{}", alloc::string::ToString::to_string(&info.message()));
-    }
-    loop {}
-}
-
