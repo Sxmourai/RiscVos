@@ -33,7 +33,7 @@ pub mod virtio;
 
 pub mod thread;
 
-pub fn main_loop() {    
+pub fn main_loop() {
     let mut blk = match unsafe { crate::virtio::VIRTIO_DEVICES[7].as_mut().unwrap() } {
         virtio::VirtIODevicePtr::Block(blk) => blk,
         _ => todo!(),
