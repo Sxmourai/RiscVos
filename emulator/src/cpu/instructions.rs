@@ -75,12 +75,12 @@ pub const INSTRUCTIONS_MASKS: [(&'static str, InstructionFormat, InstructionMask
     ("ecall",  InstructionFormat::I, _mask(0b1110011, 0b0, 0b0), crate::cpu::raw_instructions::ecall), // Immediates (fun7)
     ("ebreak", InstructionFormat::I, _mask(0b1110011, 0b0, 0b1), crate::cpu::raw_instructions::ebreak),
 
-    ("CSRRW",  InstructionFormat::I, _mask(0b1110011, 0b001, 0b0), crate::cpu::raw_instructions::CSRRW),
-    ("CSRRS",  InstructionFormat::I, _mask(0b1110011, 0b010, 0b0), crate::cpu::raw_instructions::CSRRS),
-    ("CSRRC",  InstructionFormat::I, _mask(0b1110011, 0b011, 0b0), crate::cpu::raw_instructions::CSRRC),
-    ("CSRRWI", InstructionFormat::I, _mask(0b1110011, 0b101, 0b0), crate::cpu::raw_instructions::CSRRWI),
-    ("CSRRSI", InstructionFormat::I, _mask(0b1110011, 0b110, 0b0), crate::cpu::raw_instructions::CSRRSI),
-    ("CSRRCI", InstructionFormat::I, _mask(0b1110011, 0b111, 0b0), crate::cpu::raw_instructions::CSRRCI),
+    ("csrrw",  InstructionFormat::I, _mask(0b1110011, 0b001, 0b0), crate::cpu::raw_instructions::csrrw),
+    ("csrrs",  InstructionFormat::I, _mask(0b1110011, 0b010, 0b0), crate::cpu::raw_instructions::csrrs),
+    ("csrrc",  InstructionFormat::I, _mask(0b1110011, 0b011, 0b0), crate::cpu::raw_instructions::csrrc),
+    ("csrrwi", InstructionFormat::I, _mask(0b1110011, 0b101, 0b0), crate::cpu::raw_instructions::csrrwi),
+    ("csrrsi", InstructionFormat::I, _mask(0b1110011, 0b110, 0b0), crate::cpu::raw_instructions::csrrsi),
+    ("csrrci", InstructionFormat::I, _mask(0b1110011, 0b111, 0b0), crate::cpu::raw_instructions::csrrci),
 ];
 
 

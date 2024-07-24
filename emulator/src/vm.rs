@@ -14,16 +14,16 @@ impl VM {
     }
     // More efficient than `(program[5] as u16) << 8|program[4] as u16` ?
     pub fn get_dword(&self, idx: usize) -> u32 {
-        self.get_T::<u32>(idx)
+        self.get_any::<u32>(idx)
     }
     pub fn set_dword(&mut self, idx: usize, value: u32) {
-        self.set_T::<u32>(idx, value)
+        self.set_any::<u32>(idx, value)
     }
-    pub fn get_T<T: Copy>(&self, idx: usize) -> T {
+    pub fn get_any<T: Copy>(&self, idx: usize) -> T {
         assert!(idx < self.memory.len()/core::mem::size_of::<T>());
         unsafe {*((self.memory.as_ptr() as *const T).offset(idx as isize))}
     }
-    pub fn set_T<T: Copy>(&mut self, idx: usize, value: T) {
+    pub fn set_any<T: Copy>(&mut self, idx: usize, value: T) {
         assert!(idx < self.memory.len()/core::mem::size_of::<T>());
         unsafe {*((self.memory.as_mut_ptr() as *mut T).offset(idx as isize)) = value}
     }
@@ -82,3 +82,6 @@ impl VM {
     }
 }
 
+pub fn run(program: Vec<u8>) {
+    VM::new(program).run();
+}

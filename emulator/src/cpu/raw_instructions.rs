@@ -8,7 +8,7 @@ pub fn lb       (vm: &mut crate::vm::VM, rs1: RegisterValue, rs2: RegisterValue)
     vm.memory[(rs1+rs2) as usize] as _
 }
 pub fn lh       (vm: &mut crate::vm::VM, rs1: RegisterValue, rs2: RegisterValue) -> u32 {
-    vm.get_T::<u16>((rs1+rs2) as usize/2) as _
+    vm.get_any::<u16>((rs1+rs2) as usize/2) as _
 }
 pub fn lw       (vm: &mut crate::vm::VM, rs1: RegisterValue, rs2: RegisterValue) -> u32 {
     vm.get_dword((rs1+rs2) as usize/4)
@@ -21,7 +21,7 @@ pub fn lbu      (vm: &mut crate::vm::VM, rs1: RegisterValue, rs2: RegisterValue)
     vm.memory[(rs1+rs2) as usize] as _
 }
 pub fn lhu      (vm: &mut crate::vm::VM, rs1: RegisterValue, rs2: RegisterValue) -> u32 {
-    vm.get_T::<u16>((rs1+rs2) as usize/2) as _
+    vm.get_any::<u16>((rs1+rs2) as usize/2) as _
 }
 pub fn lwu      (vm: &mut crate::vm::VM, rs1: RegisterValue, rs2: RegisterValue) -> u32 {
     vm.get_dword((rs1+rs2) as usize/4)
@@ -81,7 +81,7 @@ pub fn _store<T: Copy>(vm: &mut crate::vm::VM, instruction: u32, rs2: T) -> u32 
     let rs1 = vm.cpu.as_array()[instruction.get_bits(15..=19) as usize];
     dbg!(imm, rs1, instruction);
 
-    vm.set_T::<T>(((rs1+imm) as usize)/core::mem::size_of::<T>(), rs2);
+    vm.set_any::<T>(((rs1+imm) as usize)/core::mem::size_of::<T>(), rs2);
     0
 }
 
@@ -204,21 +204,21 @@ pub fn ecall    (vm: &mut crate::vm::VM, rs1: RegisterValue, rs2: RegisterValue)
 pub fn ebreak   (vm: &mut crate::vm::VM, rs1: RegisterValue, rs2: RegisterValue) -> u32 {
     todo!()
 }
-pub fn CSRRW    (vm: &mut crate::vm::VM, rs1: RegisterValue, rs2: RegisterValue) -> u32 {
+pub fn csrrw    (vm: &mut crate::vm::VM, rs1: RegisterValue, rs2: RegisterValue) -> u32 {
     todo!()
 }
-pub fn CSRRS    (vm: &mut crate::vm::VM, rs1: RegisterValue, rs2: RegisterValue) -> u32 {
+pub fn csrrs    (vm: &mut crate::vm::VM, rs1: RegisterValue, rs2: RegisterValue) -> u32 {
     todo!()
 }
-pub fn CSRRC    (vm: &mut crate::vm::VM, rs1: RegisterValue, rs2: RegisterValue) -> u32 {
+pub fn csrrc    (vm: &mut crate::vm::VM, rs1: RegisterValue, rs2: RegisterValue) -> u32 {
     todo!()
 }
-pub fn CSRRWI   (vm: &mut crate::vm::VM, rs1: RegisterValue, rs2: RegisterValue) -> u32 {
+pub fn csrrwi   (vm: &mut crate::vm::VM, rs1: RegisterValue, rs2: RegisterValue) -> u32 {
     todo!()
 }
-pub fn CSRRSI   (vm: &mut crate::vm::VM, rs1: RegisterValue, rs2: RegisterValue) -> u32 {
+pub fn csrrsi   (vm: &mut crate::vm::VM, rs1: RegisterValue, rs2: RegisterValue) -> u32 {
     todo!()
 }
-pub fn CSRRCI   (vm: &mut crate::vm::VM, rs1: RegisterValue, rs2: RegisterValue) -> u32 {
+pub fn csrrci   (vm: &mut crate::vm::VM, rs1: RegisterValue, rs2: RegisterValue) -> u32 {
     todo!()
 }

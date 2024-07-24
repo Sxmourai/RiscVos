@@ -1,5 +1,6 @@
 import script_lib
 args = script_lib.parse_args(args=[[["--tests"], {"default": "all"}]])
+args.build_args += '--features testing '
 
 import os
 raw = ""
@@ -29,7 +30,6 @@ with open("target/compiled_tests.rs", "w") as f:
     f.write(f"""
 pub const TESTS_FNS: [(&'static str, fn()); {len(fnames)}] = [{tests_fns}];
 """)
-args.build_args += '--features testing'
 
 script_lib.build_kernel(args)
 cmd = script_lib.qemu_cmd(args)
