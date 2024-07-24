@@ -17,6 +17,7 @@ pub const VIRTIO_END: usize =   0x1000_8000;
 pub const VIRTIO_STRIDE: usize = 0x1000;
 pub const VIRTIO_MAGIC: u32 = 0x74_72_69_76; // "virt" in little endian
 pub const VIRTIO_COUNT: usize = (VIRTIO_END-VIRTIO_START)/VIRTIO_STRIDE+1;
+
 pub static mut VIRTIO_DEVICES: [Option<VirtIODevicePtr>; VIRTIO_COUNT] = [const{None}; VIRTIO_COUNT];
 
 
