@@ -13,18 +13,19 @@ impl VM {
         }
     }
     // More efficient than `(program[5] as u16) << 8|program[4] as u16` ?
-    pub fn get_word(&self, idx: usize) -> u16 {
-        unsafe {*((self.memory.as_ptr() as *const u16).offset(idx as isize))}
-    }
     pub fn get_dword(&self, idx: usize) -> u32 {
-        // assert!(idx < self.memory.len()/4);
-        unsafe {*((self.memory.as_ptr() as *const u32).offset(idx as isize))}
+        self.get_T::<u32>(idx)
     }
     pub fn set_dword(&mut self, idx: usize, value: u32) {
-        unsafe {*((self.memory.as_mut_ptr() as *mut u32).offset(idx as isize)) = value}
+        self.set_T::<u32>(idx, value)
     }
     pub fn get_T<T: Copy>(&self, idx: usize) -> T {
+        assert!(idx < self.memory.len()/core::mem::size_of::<T>());
         unsafe {*((self.memory.as_ptr() as *const T).offset(idx as isize))}
+    }
+    pub fn set_T<T: Copy>(&mut self, idx: usize, value: T) {
+        assert!(idx < self.memory.len()/core::mem::size_of::<T>());
+        unsafe {*((self.memory.as_mut_ptr() as *mut T).offset(idx as isize)) = value}
     }
     pub fn run(&mut self) {
         loop {

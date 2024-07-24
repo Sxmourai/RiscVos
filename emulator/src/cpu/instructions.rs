@@ -64,9 +64,9 @@ pub const INSTRUCTIONS_MASKS: [(&'static str, InstructionFormat, InstructionMask
 
     ("beq",  InstructionFormat::B, _mask(0b1100011, 0b000, 0b0), crate::cpu::raw_instructions::beq),
     ("bne",  InstructionFormat::B, _mask(0b1100011, 0b001, 0b0), crate::cpu::raw_instructions::bne),
-    ("bit",  InstructionFormat::B, _mask(0b1100011, 0b100, 0b0), crate::cpu::raw_instructions::bit),
+    ("blt",  InstructionFormat::B, _mask(0b1100011, 0b100, 0b0), crate::cpu::raw_instructions::blt),
     ("bge",  InstructionFormat::B, _mask(0b1100011, 0b101, 0b0), crate::cpu::raw_instructions::bge),
-    ("bitu", InstructionFormat::B, _mask(0b1100011, 0b110, 0b0), crate::cpu::raw_instructions::bitu),
+    ("bltu", InstructionFormat::B, _mask(0b1100011, 0b110, 0b0), crate::cpu::raw_instructions::bltu),
     ("bgeu", InstructionFormat::B, _mask(0b1100011, 0b111, 0b0), crate::cpu::raw_instructions::bgeu),
 
     ("jalr", InstructionFormat::I, _mask(0b1100111, 0b000, 0b0), crate::cpu::raw_instructions::jalr),
@@ -195,8 +195,8 @@ impl Instruction {
         match self.format() {
             InstructionFormat::R => Destination::CpuRegister(self.rd()),
             InstructionFormat::I => Destination::CpuRegister(self.rd()),
-            InstructionFormat::S => Destination::Immediate(self.0.get_bits(7..=11) | (self.0.get_bits(25..=31) << 5)),
-            InstructionFormat::B => Destination::Immediate((self.0.get_bits(8..=11)<<1) | (self.0.get_bits(25..=30) << 4) | ((self.0 & (1<<7))<<11) | ((self.0 & (1<<31))<<12)),
+            InstructionFormat::S => Destination::CpuRegister(Register(0)),
+            InstructionFormat::B => Destination::CpuRegister(Register(0)),
             InstructionFormat::U => Destination::CpuRegister(self.rd()),
             InstructionFormat::J => Destination::CpuRegister(self.rd()),
         }
@@ -206,8 +206,8 @@ impl Instruction {
         match self.format() {
             InstructionFormat::R => (Destination::CpuRegister(self.rs1()), true),
             InstructionFormat::I => (Destination::CpuRegister(self.rs1()), true),
-            InstructionFormat::S => (Destination::CpuRegister(self.rs1()), true),
-            InstructionFormat::B => (Destination::CpuRegister(self.rs1()), true),
+            InstructionFormat::S => (Destination::Immediate(self.0), true), // S has 3 inputs and no outputs, so we put everything in one number
+            InstructionFormat::B => (Destination::Immediate(self.0), false), // B has 3 inputs and no outputs, so we put everything in one number
             InstructionFormat::U => (Destination::Immediate(self.0 & 0xFFFFF000), false),
             InstructionFormat::J => (Destination::Immediate((self.0.get_bits(21..=30)<<1) | (self.0.get_bits(20..=20)<<11) | (self.0.get_bits(12..=19)<<12) | (self.0.get_bits(31..=31)<<20)), false),
         }
@@ -216,8 +216,8 @@ impl Instruction {
         match self.format() {
             InstructionFormat::R => Destination::CpuRegister(self.rs2()),
             InstructionFormat::I => Destination::Immediate(self.0.get_bits(20..=31)),
-            InstructionFormat::S => Destination::CpuRegister(self.rs2()),
-            InstructionFormat::B => Destination::CpuRegister(self.rs2()),
+            InstructionFormat::S => {Destination::CpuRegister(self.rs2())},
+            InstructionFormat::B => {println!("WARN: Trying to get s2 of a B format");Destination::Immediate(0)},
             InstructionFormat::U => {println!("WARN: Trying to get s2 of a U format");Destination::Immediate(0)}, // No rs2
             InstructionFormat::J => {println!("WARN: Trying to get s2 of a J format");Destination::Immediate(0)}, // No rs2
         }
