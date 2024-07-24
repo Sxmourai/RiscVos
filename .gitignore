@@ -1,0 +1,5 @@
+kernel/target/**
+emulator/target/**
+**:Zone.Identifier
+**out.dtb
+**/__pycache__
