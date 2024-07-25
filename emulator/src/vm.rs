@@ -20,18 +20,18 @@ impl VM {
         self.set_any::<u32>(idx, value)
     }
     pub fn get_any<T: Copy>(&self, idx: usize) -> T {
-        assert!(idx < self.memory.len()/core::mem::size_of::<T>());
-        unsafe {*((self.memory.as_ptr() as *const T).offset(idx as isize))}
+        assert!(idx < self.memory.len());
+        unsafe {*((self.memory.as_ptr() as *const T).byte_add(idx))}
     }
     pub fn set_any<T: Copy>(&mut self, idx: usize, value: T) {
-        assert!(idx < self.memory.len()/core::mem::size_of::<T>());
-        unsafe {*((self.memory.as_mut_ptr() as *mut T).offset(idx as isize)) = value}
+        assert!(idx < self.memory.len());
+        unsafe {*((self.memory.as_mut_ptr() as *mut T).byte_add(idx)) = value}
     }
     pub fn run(&mut self) {
         loop {
             if self.cpu.pc as usize >= self.memory.len() {break;}
             // Fetch
-            let inst = Instruction::new(self.get_dword(self.cpu.pc as usize/core::mem::size_of::<Instruction>()));
+            let inst = Instruction::new(self.get_dword(self.cpu.pc as usize));
             if inst.is_none() {println!("The program didn't enter in a end-loop ! This would've led to UB");break;}
             let inst = inst.unwrap(); // Unwrap unchecked
             // Execute
