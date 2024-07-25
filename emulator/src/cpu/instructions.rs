@@ -1,7 +1,7 @@
+use color_eyre::{Report, Result};
 use std::cell::OnceCell;
 use bit_field::BitField;
-use super::reg::{Register, RegisterValue};
-use super::{raw_instructions::*, CPU};
+use super::{raw_instructions::*, reg::Reg, CPU};
 
 const fn _mask(opcode: u32, fun3: u32, fun7: u32) -> InstructionMask {
     InstructionMask(opcode | fun3 << 12 | fun7 << 25)
@@ -85,13 +85,13 @@ pub const INSTRUCTIONS_MASKS: [(&'static str, InstructionFormat, InstructionMask
 
 
 
-fn get_from_opcode(opcode:u32) -> &'static Vec<InstructionDescription> {
+fn get_from_opcode(opcode:u8) -> &'static Vec<InstructionDescription> {
     unsafe{&REVERSE_INSTRUCTIONS_MASKS.get().unwrap()[opcode as usize]}
 }
-pub fn try_find_instruction_desc(inst: Instruction) -> Option<InstructionDescription> {
+pub fn try_find_instruction_desc(inst: Instruction) -> Result<InstructionDescription> {
     let opcode = inst.opcode();
     let neighbors = get_from_opcode(opcode);
-    if neighbors.is_empty() {return None;}
+    if neighbors.is_empty() {return Err(color_eyre::Report::msg(format!("Invalid opcode ({opcode}, {inst:?})")));}
     let fmt = neighbors[0].1;
     for (_name, _fmt, mask, fun) in neighbors {
         let mi = Instruction(mask.0);
@@ -103,11 +103,10 @@ pub fn try_find_instruction_desc(inst: Instruction) -> Option<InstructionDescrip
             InstructionFormat::U => {true},
             InstructionFormat::J => {true},
         } {
-            return Some((_name, fmt, *mask, *fun))
+            return Ok((_name, fmt, *mask, *fun))
         }
     }
-    println!("Didn't find instruction description: {:b}", inst.0);
-    None
+    Err(Report::msg(format!("Didn't find instruction description: {:b}", inst.0)))
 }
 pub fn find_instruction_desc(inst: Instruction) -> InstructionDescription {
     try_find_instruction_desc(inst).unwrap()
@@ -129,39 +128,39 @@ pub fn set_instructions_funcs() {
 #[derive(Clone, Copy)]
 pub struct Instruction(pub u32);
 impl Instruction {
-    pub fn new(inst: u32) -> Option<Self> {
+    pub fn new(inst: u32) -> Result<Self> {
         let s = Self(inst);
         try_find_instruction_desc(s)?;
-        Some(s)
+        Ok(s)
     }
     // 7 bits
-    pub fn opcode(self) -> u32 {
-        self.0.get_bits(0..=6)
+    pub fn opcode(self) -> u8 {
+        self.0.get_bits(0..=6).try_into().unwrap() // Unwrap unchecked
     }
     // Only usefull if instruction is of type R, I, U, J
     // Destination register
     // 4 bits
-    pub fn rd(self) -> Register {
-        Register::new(self._raw_rd())
+    pub fn rd(self) -> Reg {
+        Reg::new(self._raw_rd())
     }
-    pub fn _raw_rd(self) -> u32 {
-        self.0.get_bits(7..=11)
+    pub fn _raw_rd(self) -> u8 {
+        self.0.get_bits(7..=11).try_into().unwrap() // Unwrap unchecked
     }
     // 4 bits
     // Register source 1
-    pub fn rs1(self) -> Register {
-        Register::new(self._raw_rs1())
+    pub fn rs1(self) -> Reg {
+        Reg::new(self._raw_rs1())
     }
-    pub fn _raw_rs1(self) -> u32 {
-        self.0.get_bits(15..=19)
+    pub fn _raw_rs1(self) -> u8 {
+        self.0.get_bits(15..=19).try_into().unwrap() // Unwrap unchecked
     }
     // 4 bits
     // Register source 2
-    pub fn rs2(self) -> Register {
-        Register::new(self._raw_rs2())
+    pub fn rs2(self) -> Reg {
+        Reg::new(self._raw_rs2())
     }
-    pub fn _raw_rs2(self) -> u32 {
-        self.0.get_bits(20..=24)
+    pub fn _raw_rs2(self) -> u8 {
+        self.0.get_bits(20..=24).try_into().unwrap() // Unwrap unchecked
     }
     // 2 bits (more info about operation)
     pub fn fun3(self) -> u32 {
@@ -195,8 +194,8 @@ impl Instruction {
         match self.format() {
             InstructionFormat::R => Destination::CpuRegister(self.rd()),
             InstructionFormat::I => Destination::CpuRegister(self.rd()),
-            InstructionFormat::S => Destination::CpuRegister(Register(0)),
-            InstructionFormat::B => Destination::CpuRegister(Register(0)),
+            InstructionFormat::S => Destination::CpuRegister(Reg::zero),
+            InstructionFormat::B => Destination::CpuRegister(Reg::zero),
             InstructionFormat::U => Destination::CpuRegister(self.rd()),
             InstructionFormat::J => Destination::CpuRegister(self.rd()),
         }
@@ -239,14 +238,14 @@ impl std::fmt::Display for Instruction {
 
 #[derive(Debug)]
 pub enum Destination {
-    CpuRegister(Register),
+    CpuRegister(Reg),
     Immediate(u32),
 }
 
 impl std::fmt::Display for Destination {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let val = match self {
-            Destination::CpuRegister(reg) => super::reg::REGS[reg.0 as usize].to_string(),
+            Destination::CpuRegister(reg) => format!("{:?}", reg),
             Destination::Immediate(imm) => format!("{}", imm),
         };
         f.write_fmt(format_args!("{}", val))
@@ -285,13 +284,7 @@ pub enum InstructionFormat {
 }
 
 
-
-// rDestination, rS1, rS2
-pub fn parse_r(i: Instruction) -> (Register, Register, Register) {
-    (i.rd(),i.rs1(),i.rs2())
-}
-
-pub fn empty_fun(rs1:RegisterValue, rs2:RegisterValue) -> RegisterValue {
+pub fn empty_fun(rs1:u32, rs2:u32) -> u32 {
     dbg!(rs1,rs2);
     dbg!("Unsupported function !");
     0
