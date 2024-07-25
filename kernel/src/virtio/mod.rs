@@ -48,18 +48,30 @@ pub fn init() {
           // Not connected
         }
         else {
-            let idx = (addr - VIRTIO_START) / VIRTIO_STRIDE;
-            let mut mmio = StandardVirtIO { idx, read_only: false };
-            if init_device(&mut mmio).is_none() {warn!("Failed initialising device {}", deviceid);}
-            // https://docs.oasis-open.org/virtio/virtio/v1.1/csprd01/virtio-v1.1-csprd01.html#x1-1930005
-    
-            if let Some(device) = match deviceid {
-                2 => {block_device(mmio)},
-                4 => {todo!()},
-                _ => {todo!("support this device: {}", deviceid)},
-            } {
-                #[allow(unused_results)]
-                unsafe { VIRTIO_DEVICES[idx].replace(device); };
+            init_virt_device(addr, deviceid);
+        }
+    }
+}
+fn init_virt_device(addr: usize, deviceid: u32) -> Option<()> {
+    let idx = (addr - VIRTIO_START) / VIRTIO_STRIDE;
+    let mut mmio = StandardVirtIO { idx, read_only: false };
+    // https://docs.oasis-open.org/virtio/virtio/v1.1/csprd01/virtio-v1.1-csprd01.html#x1-1930005
+    let supported_feats = VirtIODevicePtr::supported_features(deviceid);
+    init_device(&mut mmio, supported_feats)?;
+    let dev = match deviceid {
+        1 =>  {network::init_device(mmio)},
+        2 =>  {block::init_device(mmio)},
+        3 =>  {console::init_device(mmio)},
+        4 =>  {entropy::init_device(mmio)},
+        16 => {gpu::init_device(mmio)},
+        18 => {input::init_device(mmio)},
+        24 => {memory::init_device(mmio)},
+        _ =>  {todo!("Not supported {}", deviceid)},
+    }?;
+
+    unsafe { VIRTIO_DEVICES[idx].replace(dev); };
+    Some(())
+}
                 // for i in 0..1000000 {}
                 // let mut buf = Vec::with_capacity(512);
                 // unsafe { buf.set_len(buf.capacity()) }
@@ -77,15 +89,6 @@ pub fn init() {
                 // dev.read(0, &mut buf2).unwrap();
                 // for i in 0..1000000 {}
                 // dbg!(buf2);
-            }
-        }
-    }
-}
-
-pub fn block_device(mmio: StandardVirtIO) -> Option<VirtIODevicePtr> {
-    let blk = block::BlockDevice::new(mmio)?;
-    Some(VirtIODevicePtr::Block(Box::new(blk)))
-}
 
 #[derive(Debug)]
 pub struct StandardVirtIO {
@@ -169,10 +172,10 @@ impl core::fmt::Debug for Queue {
 
 
 /// TODO Return result
-fn init_device(dev: &mut StandardVirtIO) -> Option<()> {
+fn init_device(dev: &mut StandardVirtIO, supported_features: u32) -> Option<()> {
     unsafe {
         let mut status_bits = 0;
-        dev.write(MmioOffset::Status, status_bits);
+        dev.write(MmioOffset::Status, status_bits); // Reset device
         status_bits |= StatusField::Acknowledge;
         dev.write(MmioOffset::Status, status_bits);
         status_bits |= StatusField::DriverOk;
@@ -180,7 +183,7 @@ fn init_device(dev: &mut StandardVirtIO) -> Option<()> {
         // Read device feature bits, write subset of feature
         // we support and device support.
         let host_features = dev.read(MmioOffset::HostFeatures);
-        let guest_features = host_features & !(1 << block::VIRTIO_BLK_F_RO);
+        let guest_features = host_features & supported_features;
         let ro = host_features & (1 << block::VIRTIO_BLK_F_RO) != 0;
         dev.write(MmioOffset::GuestFeatures, guest_features);
         status_bits |= StatusField::FeaturesOk;
@@ -271,6 +274,18 @@ impl VirtIODevicePtr {
             VirtIODevicePtr::Gpu(dev)         => dev.handle_int(),
             VirtIODevicePtr::Input(dev)     => dev.handle_int(),
             VirtIODevicePtr::Memory(dev)   => dev.handle_int(),
+        }
+    }
+    pub fn supported_features(deviceid: u32) -> u32 {
+        match deviceid {
+            1 =>  {network::SUPPORTED_FEATURES},
+            2 =>  {block::SUPPORTED_FEATURES},
+            3 =>  {console::SUPPORTED_FEATURES},
+            4 =>  {entropy::SUPPORTED_FEATURES},
+            16 => {gpu::SUPPORTED_FEATURES},
+            18 => {input::SUPPORTED_FEATURES},
+            24 => {memory::SUPPORTED_FEATURES},
+            _ => {todo!("Not supported {}", deviceid)},
         }
     }
 }

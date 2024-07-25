@@ -1,5 +1,13 @@
 use super::*;
 
+pub const SUPPORTED_FEATURES: u32 = !(1 << block::VIRTIO_BLK_F_RO);
+
+pub fn init_device(mmio: StandardVirtIO) -> Option<VirtIODevicePtr> {
+    let blk = block::BlockDevice::new(mmio)?;
+    Some(VirtIODevicePtr::Block(Box::new(blk)))
+}
+
+
 #[derive(Debug)]
 pub struct BlockDevice {
     mmio: StandardVirtIO,
