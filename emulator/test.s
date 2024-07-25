@@ -1,5 +1,12 @@
 _start:
-    addi t1, zero, 5
-    addi t2, zero, 3
-    add t3, t2, t1
-    add t4, t3, zero
+    addi t3, t1, 2
+    addi t2, t1, 3
+    addi t4, t1, 1
+    add t3, t2, t2
+    add t3, t1, t3
+    sub t3, t3, t3
+    addi t3, t1, 10
+
+_loop:
+    add t3, t3, t3
+    j 0x20

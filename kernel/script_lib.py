@@ -46,10 +46,13 @@ def parse_args(*args, **kwargs):
 import subprocess
 def build_kernel(args: argparse.ArgumentParser):
     if args.quiet:args.build_args += " -q "
-    args.build_args += "--features log/max_level_"+args.log_level
+    args.build_args += "--features log/max_level_"+args.log_level+" "
+    c = list(_strip_empty_cmd(f"cargo b --profile {args.profile} {args.build_args}"))
     try:
-        output = subprocess.check_output(_strip_empty_cmd(f"cargo b --profile {args.profile} {args.build_args}"))
-    except subprocess.CalledProcessError:exit(1)
+        output = subprocess.check_output(c)
+    except subprocess.CalledProcessError:
+        print(" ".join(c), "failed.")
+        exit(1)
     return output
 
 def qemu_cmd(args: argparse.ArgumentParser):
@@ -102,7 +105,9 @@ def handle_qemu_output(qemu: subprocess.Popen):
                 fnames = []
                 paths = []
                 for addr in addrs:
-                    fname,path = subprocess.check_output(f"riscv64-unknown-elf-addr2line -e {config().kernel_file()} -f 0x{int(addr):x}".split(" ")).decode(errors='ignore').splitlines()
+                    try:
+                        fname,path = subprocess.check_output(f"riscv64-unknown-elf-addr2line -e {config().kernel_file()} -f 0x{int(addr):x}".split(" ")).decode(errors='ignore').splitlines()
+                    except PermissionError:print("You might not have binutils-riscv64-unknown-elf, we can't give backtrace info");exit(1)
                     fnames.append(fname)
                     paths.append(path)
                 with open("target/mangled.txt", "w") as f:

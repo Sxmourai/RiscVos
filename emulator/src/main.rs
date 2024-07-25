@@ -1,3 +1,7 @@
+#![allow(unused, dead_code, non_snake_case)]
+mod args;
+mod vm;
+mod cpu;
 use clap::Parser;
 #[derive(Parser)]
 #[command(version, about)]

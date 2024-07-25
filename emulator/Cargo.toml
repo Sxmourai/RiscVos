@@ -9,4 +9,5 @@ bit_field = "0.10.2"
 bitfield = "0.15.0"
 clap = {version="4.5.7", features = ["derive"]}
 color-eyre = "0.6.3"
+hashbrown = "0.14.5"
 elf = "0.7.4"
