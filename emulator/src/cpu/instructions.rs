@@ -9,7 +9,7 @@ const fn _mask(opcode: u32, fun3: u32, fun7: u32) -> InstructionMask {
 
 // Big thanks to https://www.eg.bucknell.edu/~csci206/riscv-converter/Annotated_RISCV_Card.pdf
 // For more info about instructions https://projectf.io/posts/riscv-cheat-sheet/
-pub const INSTRUCTIONS_MASKS: [(&'static str, InstructionFormat, InstructionMask, InstructionFunction); 59] = [
+pub const INSTRUCTIONS_MASKS: [InstructionDescription; 59] = [
     ("lb",      InstructionFormat::I, _mask(0b0000011, 0b000, 0b0), crate::cpu::raw_instructions::lb), // ! Do we need to set fun7 ?
     ("lh",      InstructionFormat::I, _mask(0b0000011, 0b001, 0b0), crate::cpu::raw_instructions::lh),
     ("lw",      InstructionFormat::I, _mask(0b0000011, 0b010, 0b0), crate::cpu::raw_instructions::lw),
@@ -85,7 +85,7 @@ pub const INSTRUCTIONS_MASKS: [(&'static str, InstructionFormat, InstructionMask
 
 
 
-fn get_from_opcode(opcode:u8) -> &'static Vec<InstructionDescription> {
+pub fn get_from_opcode(opcode:u8) -> &'static Vec<InstructionDescription> {
     unsafe{&REVERSE_INSTRUCTIONS_MASKS.get().unwrap()[opcode as usize]}
 }
 pub fn try_find_instruction_desc(inst: Instruction) -> Result<InstructionDescription> {

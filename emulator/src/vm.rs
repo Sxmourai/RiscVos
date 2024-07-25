@@ -1,7 +1,7 @@
 // We can now access cpu registers using zero, s0, a0 etc... See cpu/reg.rs 
 use crate::cpu::reg::Reg;
 use color_eyre::eyre::{Context, ContextCompat};
-use cpu::instructions::INSTRUCTIONS_MASKS;
+use cpu::instructions::{get_from_opcode, INSTRUCTIONS_MASKS};
 
 use crate::*;
 use crate::cpu::instructions::Instruction;
@@ -28,7 +28,6 @@ impl VM {
                 return Ok(()) // Don't pollute stdout, for now
             }
             let instruction = Instruction::new(raw_instruction).context("The program didn't enter in a end-loop ! This would've led to UB")?;
-            if instruction.opcode() == INSTRUCTIONS_MASKS[]
             // Execute
             println!("{}\t - ", instruction);
             let (_name, _fmt, _mask, fun) = crate::cpu::instructions::find_instruction_desc(instruction);
@@ -58,6 +57,8 @@ impl VM {
             };
             self.cpu.pc += core::mem::size_of::<Instruction>() as uguest;
             *self.cpu.reg(Reg::zero) = 0; // Currently we need to set it manually
+            #[cfg(debug_assertions)]
+            std::thread::sleep(std::time::Duration::from_millis(500));
         }
         dbg!(&self.cpu);
         Ok(())

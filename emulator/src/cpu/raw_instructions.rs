@@ -93,11 +93,9 @@ macro_rules! store {
     ($size: ident, $name: ident) => {
         // u64 because we of function signature, but it's a u32 !
         pub fn $name(vm: &mut crate::vm::VM, instruction: u64, _zero: RegValue) -> RegValue {
-            dbg!(&vm.cpu);
             let rs2 = *vm.cpu.reg(Reg::new(instruction.get_bits(20..=24) as u8));
             let imm = (instruction.get_bits(7..=11) | (instruction.get_bits(25..=31) << 5));
             let rs1 = vm.cpu.reg(Reg::new(instruction.get_bits(15..=19) as u8));
-            dbg!(imm, &rs1, instruction, rs2&($size::MAX as uguest), rs2);
             vm.mem.set::<$size>((*rs1+imm as uguest), (rs2&($size::MAX as uguest)) as _);
             0
         }

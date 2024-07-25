@@ -49,7 +49,7 @@ impl MemoryMap for MemMap {
             // Self::ImsicS => 0x28000000,
             // Self::PcieEcam => 0x30000000,
             // Self::PcieMmio => 0x40000000,
-            Self::DRAM => 0x80000000,
+            Self::DRAM => 0x8000_0000,
             _ => {todo!()}
         }
     }
@@ -163,7 +163,6 @@ impl MemoryRegion for UART {
     }
 
     unsafe fn write(&mut self, offset: uguest, val: u8) {
-        dbg!(offset,val);
         if offset == 0 {
             print!("{}", val as char);
             std::io::Write::flush(&mut std::io::stdout()).unwrap()
