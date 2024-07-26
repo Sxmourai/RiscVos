@@ -18,7 +18,7 @@ pub enum SavedBy {
 //     // "fs2", "fs3", "fs4", "fs5", "fs6", "fs7", "fs8", "fs9", "fs10", "fs11",
 //     // "ft8","ft9","ft10","ft11",
 // ];
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[allow(non_camel_case_types)]
 pub enum Reg {
     zero = 0,
@@ -63,6 +63,6 @@ impl Reg {
         } else {
             todo!()
         }
-    }
-    
+    }   
 }
+

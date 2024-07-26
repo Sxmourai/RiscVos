@@ -3,87 +3,6 @@ use std::cell::OnceCell;
 use bit_field::BitField;
 use super::{raw_instructions::*, reg::Reg, CPU};
 
-const fn _mask(opcode: u32, fun3: u32, fun7: u32) -> InstructionMask {
-    InstructionMask(opcode | fun3 << 12 | fun7 << 25)
-}
-
-// Big thanks to https://www.eg.bucknell.edu/~csci206/riscv-converter/Annotated_RISCV_Card.pdf
-// For more info about instructions https://projectf.io/posts/riscv-cheat-sheet/
-pub const INSTRUCTIONS_MASKS: [InstructionDescription; 59] = [
-    ("lb",      InstructionFormat::I, _mask(0b0000011, 0b000, 0b0), crate::cpu::raw_instructions::lb), // ! Do we need to set fun7 ?
-    ("lh",      InstructionFormat::I, _mask(0b0000011, 0b001, 0b0), crate::cpu::raw_instructions::lh),
-    ("lw",      InstructionFormat::I, _mask(0b0000011, 0b010, 0b0), crate::cpu::raw_instructions::lw),
-    ("ld",      InstructionFormat::I, _mask(0b0000011, 0b011, 0b0), crate::cpu::raw_instructions::ld),
-    ("lbu",     InstructionFormat::I, _mask(0b0000011, 0b100, 0b0), crate::cpu::raw_instructions::lbu),
-    ("lhu",     InstructionFormat::I, _mask(0b0000011, 0b110, 0b0), crate::cpu::raw_instructions::lhu),
-    ("lwu",     InstructionFormat::I, _mask(0b0000011, 0b111, 0b0), crate::cpu::raw_instructions::lwu),
-    
-    ("fence",   InstructionFormat::I, _mask(0b0001111, 0b000, 0b0), crate::cpu::raw_instructions::fence),
-    ("fence.i", InstructionFormat::I, _mask(0b0001111, 0b001, 0b0), crate::cpu::raw_instructions::fencei),
-    
-    ("addi",    InstructionFormat::I, _mask(0b0010011, 0b000, 0b0), crate::cpu::raw_instructions::addi),
-    ("slli",    InstructionFormat::I, _mask(0b0010011, 0b001, 0b0), crate::cpu::raw_instructions::slli), // Has funct7 ??
-    ("slti",    InstructionFormat::I, _mask(0b0010011, 0b010, 0b0), crate::cpu::raw_instructions::slti),
-    ("sltiu",   InstructionFormat::I, _mask(0b0010011, 0b011, 0b0), crate::cpu::raw_instructions::sltiu),
-    ("xori",    InstructionFormat::I, _mask(0b0010011, 0b100, 0b0), crate::cpu::raw_instructions::xori),
-    ("srli",    InstructionFormat::I, _mask(0b0010011, 0b101, 0b0000000), crate::cpu::raw_instructions::srli),
-    ("srai",    InstructionFormat::I, _mask(0b0010011, 0b101, 0b0100000), crate::cpu::raw_instructions::srai),
-    ("ori",     InstructionFormat::I, _mask(0b0010011, 0b110, 0b0), crate::cpu::raw_instructions::ori),
-    ("andi",    InstructionFormat::I, _mask(0b0010011, 0b111, 0b0), crate::cpu::raw_instructions::andi),
-    
-    ("auipc",   InstructionFormat::U, _mask(0b0010111, 0b000, 0b0), crate::cpu::raw_instructions::auipc),
-    
-    ("addiw",   InstructionFormat::I, _mask(0b0011011, 0b000, 0b0), crate::cpu::raw_instructions::addiw),
-    ("slliw",   InstructionFormat::I, _mask(0b0011011, 0b001, 0b0000000), crate::cpu::raw_instructions::slliw),
-    ("srliw",   InstructionFormat::I, _mask(0b0011011, 0b101, 0b0000000), crate::cpu::raw_instructions::srliw),
-    ("sraiw",   InstructionFormat::I, _mask(0b0011011, 0b101, 0b0100000), crate::cpu::raw_instructions::sraiw),
-
-    ("sb",   InstructionFormat::S, _mask(0b0100011, 0b000, 0b0), crate::cpu::raw_instructions::sb),
-    ("sh",   InstructionFormat::S, _mask(0b0100011, 0b001, 0b0), crate::cpu::raw_instructions::sh),
-    ("sw",   InstructionFormat::S, _mask(0b0100011, 0b010, 0b0), crate::cpu::raw_instructions::sw),
-    ("sd",   InstructionFormat::S, _mask(0b0100011, 0b011, 0b0), crate::cpu::raw_instructions::sd),
-
-    ("add",  InstructionFormat::R, _mask(0b0110011, 0b000, 0b0000000), crate::cpu::raw_instructions::add),
-    ("sub",  InstructionFormat::R, _mask(0b0110011, 0b000, 0b0100000), crate::cpu::raw_instructions::sub),
-    ("sll",  InstructionFormat::R, _mask(0b0110011, 0b001, 0b0000000), crate::cpu::raw_instructions::sll),
-    ("slt",  InstructionFormat::R, _mask(0b0110011, 0b010, 0b0000000), crate::cpu::raw_instructions::slt),
-    ("sltu", InstructionFormat::R, _mask(0b0110011, 0b011, 0b0000000), crate::cpu::raw_instructions::sltu),
-    ("xor",  InstructionFormat::R, _mask(0b0110011, 0b100, 0b0000000), crate::cpu::raw_instructions::xor),
-    ("srl",  InstructionFormat::R, _mask(0b0110011, 0b101, 0b0000000), crate::cpu::raw_instructions::srl),
-    ("sra",  InstructionFormat::R, _mask(0b0110011, 0b101, 0b0100000), crate::cpu::raw_instructions::sra),
-    ("or",   InstructionFormat::R, _mask(0b0110011, 0b110, 0b0000000), crate::cpu::raw_instructions::or),
-    ("and",  InstructionFormat::R, _mask(0b0110011, 0b111, 0b0000000), crate::cpu::raw_instructions::and),
-
-    ("lui",  InstructionFormat::U, _mask(0b0110111, 0b0, 0b0), crate::cpu::raw_instructions::lui),
-    
-    ("addw", InstructionFormat::R, _mask(0b0111011, 0b000, 0b0000000), crate::cpu::raw_instructions::addw),
-    ("subw", InstructionFormat::R, _mask(0b0111011, 0b000, 0b0100000), crate::cpu::raw_instructions::subw),
-    ("sllw", InstructionFormat::R, _mask(0b0111011, 0b001, 0b0000000), crate::cpu::raw_instructions::sllw),
-    ("srllw",InstructionFormat::R, _mask(0b0111011, 0b101, 0b0000000), crate::cpu::raw_instructions::srllw),
-    ("sraw", InstructionFormat::R, _mask(0b0111011, 0b101, 0b0100000), crate::cpu::raw_instructions::sraw),
-
-    ("beq",  InstructionFormat::B, _mask(0b1100011, 0b000, 0b0), crate::cpu::raw_instructions::beq),
-    ("bne",  InstructionFormat::B, _mask(0b1100011, 0b001, 0b0), crate::cpu::raw_instructions::bne),
-    ("blt",  InstructionFormat::B, _mask(0b1100011, 0b100, 0b0), crate::cpu::raw_instructions::blt),
-    ("bge",  InstructionFormat::B, _mask(0b1100011, 0b101, 0b0), crate::cpu::raw_instructions::bge),
-    ("bltu", InstructionFormat::B, _mask(0b1100011, 0b110, 0b0), crate::cpu::raw_instructions::bltu),
-    ("bgeu", InstructionFormat::B, _mask(0b1100011, 0b111, 0b0), crate::cpu::raw_instructions::bgeu),
-
-    ("jalr", InstructionFormat::I, _mask(0b1100111, 0b000, 0b0), crate::cpu::raw_instructions::jalr),
-    ("jal",  InstructionFormat::U, _mask(0b1101111, 0b0, 0b0), crate::cpu::raw_instructions::jal),
-
-    ("ecall",  InstructionFormat::I, _mask(0b1110011, 0b0, 0b0), crate::cpu::raw_instructions::ecall), // Immediates (fun7)
-    ("ebreak", InstructionFormat::I, _mask(0b1110011, 0b0, 0b1), crate::cpu::raw_instructions::ebreak),
-
-    ("csrrw",  InstructionFormat::I, _mask(0b1110011, 0b001, 0b0), crate::cpu::raw_instructions::csrrw),
-    ("csrrs",  InstructionFormat::I, _mask(0b1110011, 0b010, 0b0), crate::cpu::raw_instructions::csrrs),
-    ("csrrc",  InstructionFormat::I, _mask(0b1110011, 0b011, 0b0), crate::cpu::raw_instructions::csrrc),
-    ("csrrwi", InstructionFormat::I, _mask(0b1110011, 0b101, 0b0), crate::cpu::raw_instructions::csrrwi),
-    ("csrrsi", InstructionFormat::I, _mask(0b1110011, 0b110, 0b0), crate::cpu::raw_instructions::csrrsi),
-    ("csrrci", InstructionFormat::I, _mask(0b1110011, 0b111, 0b0), crate::cpu::raw_instructions::csrrci),
-];
-
-
 
 pub fn get_from_opcode(opcode:u8) -> &'static Vec<InstructionDescription> {
     unsafe{&REVERSE_INSTRUCTIONS_MASKS.get().unwrap()[opcode as usize]}
@@ -112,17 +31,17 @@ pub fn find_instruction_desc(inst: Instruction) -> InstructionDescription {
     try_find_instruction_desc(inst).unwrap()
 }
 
-type InstructionDescription = (&'static str, InstructionFormat, InstructionMask, InstructionFunction);
 type _ReverseInstructionsMasks = [Vec<InstructionDescription>; 127];
 pub static mut REVERSE_INSTRUCTIONS_MASKS: OnceCell<_ReverseInstructionsMasks> = OnceCell::new();
 pub fn set_instructions_funcs() {
     let mut instru_funcs: _ReverseInstructionsMasks = std::array::from_fn(|_| Vec::new());
-    for (name, format, mask, fun) in INSTRUCTIONS_MASKS.iter() {
+    for (name, format, mask, fun) in INSTRUCTIONS.iter() {
         let opcode = Instruction(mask.0).opcode();
         instru_funcs[opcode as usize].push((name, *format, *mask, *fun));
     }
     unsafe{REVERSE_INSTRUCTIONS_MASKS.set(instru_funcs).unwrap()}
 }
+
 
 
 #[derive(Clone, Copy)]
@@ -133,6 +52,29 @@ impl Instruction {
         try_find_instruction_desc(s)?;
         Ok(s)
     }
+    pub fn parse_r(self) -> (Rs1, Rs2, Rd) {
+        (self.rs1() as _,self.rs2() as _, self.rd())
+    }
+    pub fn parse_i(self) -> (Imm, Rs1, Rd) {
+        (self.0.get_bits(20..=31) as _,self.rs1() as _,self.rd())
+    }
+    // Output in Imm
+    pub fn parse_s(self) -> (Imm, Rs1, Rs2) {
+        ((self.0.get_bits(7..=11)|(self.0.get_bits(25..=31)<<5)) as _,self.rs1() as _,self.rs2() as _)
+    }
+    pub fn parse_b(self) -> (Imm, Rs1, Rs2) {
+        (((self.0.get_bits(8..=11)<<1) | (self.0.get_bits(25..=30) << 4) | ((self.0 & (1<<7))<<11) | ((self.0 & (1<<31))<<12)) as _,
+        self.rs1() as _,self.rs2() as _)
+    }
+    pub fn parse_u(self) -> (UImm, Rd) { // 19 bits Imm
+        ((self.0 & 0xFFFFF000) as _,
+        self.rd() as _,)
+    }
+    pub fn parse_j(self) -> (Imm, Rd) {
+        (((self.0.get_bits(21..=30)<<1) | (self.0.get_bits(20..=20)<<11) | (self.0 & 0x7F000) | (self.0.get_bits(31..=31)<<20)) as _,
+        self.rd() as _,)
+    }
+
     // 7 bits
     pub fn opcode(self) -> u8 {
         self.0.get_bits(0..=6).try_into().unwrap() // Unwrap unchecked
@@ -204,7 +146,7 @@ impl Instruction {
     pub fn s1(self) -> (Destination, bool) {
         match self.format() {
             InstructionFormat::R => (Destination::CpuRegister(self.rs1()), true),
-            InstructionFormat::I => (Destination::CpuRegister(self.rs1()), true),
+            InstructionFormat::I => (Destination::Immediate(self.0), true),
             InstructionFormat::S => (Destination::Immediate(self.0), true), // S has 3 inputs and no outputs, so we put everything in one number
             InstructionFormat::B => (Destination::Immediate(self.0), false), // B has 3 inputs and no outputs, so we put everything in one number
             InstructionFormat::U => (Destination::Immediate(self.0 & 0xFFFFF000), false),
@@ -255,8 +197,6 @@ impl std::fmt::Display for Destination {
 
 
 
-#[derive(Clone, Copy, Debug)]
-pub struct InstructionMask(pub u32);
 // impl InstructionMask {
 //     // Returns true if the mask corresponds to the same instruction
 //     // Like if opcode is same, fun3 and fun7 if there is one
@@ -278,10 +218,6 @@ pub struct InstructionMask(pub u32);
 
 
 
-#[derive(Debug, Clone, Copy)]
-pub enum InstructionFormat {
-    R,I,S,B,U,J,
-}
 
 
 pub fn empty_fun(rs1:u32, rs2:u32) -> u32 {

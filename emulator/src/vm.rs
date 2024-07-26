@@ -1,7 +1,7 @@
 // We can now access cpu registers using zero, s0, a0 etc... See cpu/reg.rs 
 use crate::cpu::reg::Reg;
 use color_eyre::eyre::{Context, ContextCompat};
-use cpu::instructions::{get_from_opcode, INSTRUCTIONS_MASKS};
+use cpu::instructions::get_from_opcode;
 
 use crate::*;
 use crate::cpu::instructions::Instruction;
@@ -32,29 +32,15 @@ impl VM {
             println!("{}\t - ", instruction);
             let (_name, _fmt, _mask, fun) = crate::cpu::instructions::find_instruction_desc(instruction);
 
-            let (s1, has_s2) = match instruction.s1() {
-                (crate::cpu::instructions::Destination::CpuRegister(reg), has_s2) => {
-                    (*self.cpu.reg(reg), has_s2)
-                }
-                (crate::cpu::instructions::Destination::Immediate(imm), has_s2) => (imm as uguest, has_s2),
-            };
-            let s2 = if has_s2 {
-                match instruction.s2() {
-                    crate::cpu::instructions::Destination::CpuRegister(reg) => *self.cpu.reg(reg),
-                    crate::cpu::instructions::Destination::Immediate(imm) => imm as uguest,
-                }
-            } else {
-                0
-            };
-            let d = fun(self, s1, s2);
+            fun(self, instruction);
 
             // println!("{}={}\t{}={}\t-> {}={}", inst.s1().0,s1,inst.s2(),s2,inst.destination(),d);
-            match instruction.destination() {
-                crate::cpu::instructions::Destination::CpuRegister(reg) => *self.cpu.reg(reg) = d,
-                crate::cpu::instructions::Destination::Immediate(imm) => {
-                    self.mem.set::<_>(imm as _, d).unwrap()
-                }
-            };
+            // match instruction.destination() {
+            //     crate::cpu::instructions::Destination::CpuRegister(reg) => *self.cpu.reg(reg) = d,
+            //     crate::cpu::instructions::Destination::Immediate(imm) => {
+            //         self.mem.set::<_>(imm as _, d).unwrap()
+            //     }
+            // };
             self.cpu.pc += core::mem::size_of::<Instruction>() as uguest;
             *self.cpu.reg(Reg::zero) = 0; // Currently we need to set it manually
             #[cfg(debug_assertions)]
@@ -77,3 +63,18 @@ impl VM {
 pub fn run(program: Vec<u8>) {
     VM::new(program).run().unwrap();
 }
+
+// let (s1, has_s2) = match instruction.s1() {
+//     (crate::cpu::instructions::Destination::CpuRegister(reg), has_s2) => {
+//         (*self.cpu.reg(reg), has_s2)
+//     }
+//     (crate::cpu::instructions::Destination::Immediate(imm), has_s2) => (imm as uguest, has_s2),
+// };
+// let s2 = if has_s2 {
+//     match instruction.s2() {
+//         crate::cpu::instructions::Destination::CpuRegister(reg) => *self.cpu.reg(reg),
+//         crate::cpu::instructions::Destination::Immediate(imm) => imm as uguest,
+//     }
+// } else {
+//     0
+// };
