@@ -5,9 +5,9 @@ def gen_func(ty: str, args: str):
     parser = f"parse_{ty.lower()}"
     inner_code = "#code"
     if "rs1" in args:
-        inner_code = f"let rs1 = *vm.cpu.reg(rs1);\n{inner_code}"
+        inner_code = f"let vs1 = *vm.cpu.reg(rs1);\n{inner_code}"
     if "rs2" in args:
-        inner_code = f"let rs2 = *vm.cpu.reg(rs2);\n{inner_code}"
+        inner_code = f"let vs2 = *vm.cpu.reg(rs2);\n{inner_code}"
     if "rd" in args:
         inner_code = inner_code.replace("#code", f"*vm.cpu.reg(rd) = #code")
         

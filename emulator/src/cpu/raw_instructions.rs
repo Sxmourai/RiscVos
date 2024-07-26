@@ -11,9 +11,12 @@ use instruction_proc::instruction_b as b;
 pub type Rd = super::reg::Reg;
 pub type Rs1 = super::reg::Reg;
 pub type Rs2 = super::reg::Reg;
+pub type Vs1 = uguest;
+pub type Vs2 = uguest;
 pub type Imm = u16;
 pub type UImm = u32;
 
+use crate::cpu::reg::Reg;
 use crate::uguest;
 use crate::cpu::CsrID;
 
@@ -27,17 +30,17 @@ const fn desc(macro_out: (&'static str, InstructionFormat, InstructionFunction),
 macro_rules! load {
     ($size: ty,$name: ident,$func3: expr) => {
         desc(i!($name, {
-            vm.mem.get::<$size>((rs1+imm as uguest)).unwrap() as _
+            vm.mem.get::<$size>((vs1+imm as uguest)).unwrap() as _
         }), _mask(0b0000011, $func3, 0b0))
         // pub fn $name(vm: &mut crate::vm::VM, instruction: Instruction) {
-        //     let (rs1, imm, dest) = Instruction::parse_i(instruction);
+        //     let (vs1, imm, dest) = Instruction::parse_i(instruction);
         // }
     };
 }
 macro_rules! store {
     ($size: ty,$name: ident,$func3: expr) => {
         desc(s!($name, {
-            vm.mem.set::<$size>((rs1+imm as uguest), (rs2&($size::MAX as uguest)) as _).unwrap();
+            vm.mem.set::<$size>((vs1+imm as uguest), (vs2&($size::MAX as uguest)) as _).unwrap();
         }), _mask(0b0100011, $func3, 0b0))
     };
 }
@@ -46,7 +49,7 @@ macro_rules! store {
 macro_rules! op_i {
     ($name: ident, $operator: expr) => {
         i!($name, {
-            let res = $operator(rs1, imm as uguest);
+            let res = $operator(vs1, imm as uguest);
             res
         })
     };
@@ -54,7 +57,7 @@ macro_rules! op_i {
 macro_rules! op_r {
     ($name: ident, $func3: expr, $func7:expr, $operator: expr) => {
         desc(r!($name, {
-            let res = $operator(rs1, rs2);
+            let res = $operator(vs1, vs2);
             res
         }), _mask(0b0110011, $func3, $func7))
     };
@@ -63,9 +66,9 @@ macro_rules! op_r {
 macro_rules! branch {
     ($name: ident, $func3: expr, $op: tt) => {
         desc(s!($name, {
-            dbg!(rs1,rs2, imm);
-            if $op(rs1,rs2) {
-                vm.cpu.pc += rs2
+            dbg!(vs1,vs2, imm);
+            if $op(vs1,vs2) {
+                vm.cpu.pc += vs2
             };
         }), _mask(0b1100011, $func3, 0b0))
     };
@@ -117,10 +120,10 @@ pub const INSTRUCTIONS: [InstructionDescription; 60] = [
     
     desc(u!(auipc, {vm.cpu.pc+(imm as uguest)}), _mask(0b0010111, 0b000, 0b0)),
     
-    desc(i!(addiw, {rs1+imm as uguest}), _mask(0b0011011, 0b000, 0b0)),
-    desc(i!(slliw, {(rs1)<<(imm as uguest)}), _mask(0b0011011, 0b001, 0b0000000)),
-    desc(i!(srliw, {rs1>>imm as uguest}), _mask(0b0011011, 0b101, 0b0000000)),
-    desc(i!(sraiw, {todo!("rs1>>>imm as uguest")}), _mask(0b0011011, 0b101, 0b0100000)),
+    desc(i!(addiw, {vs1+imm as uguest}), _mask(0b0011011, 0b000, 0b0)),
+    desc(i!(slliw, {(vs1)<<(imm as uguest)}), _mask(0b0011011, 0b001, 0b0000000)),
+    desc(i!(srliw, {vs1>>imm as uguest}), _mask(0b0011011, 0b101, 0b0000000)),
+    desc(i!(sraiw, {todo!("vs1>>>imm as uguest")}), _mask(0b0011011, 0b101, 0b0100000)),
     
     store!(u8,  sb, 0b000),
     store!(u16, sh, 0b001),
@@ -146,16 +149,18 @@ pub const INSTRUCTIONS: [InstructionDescription; 60] = [
     desc(r!(srllw, {todo!()}), _mask(0b0111011, 0b101, 0b0000000)),
     desc(r!(sraw, {todo!()}),  _mask(0b0111011, 0b101, 0b0100000)),
     
-    branch!(beq,  0b000, (|rs1,rs2| rs1==rs2)), // Branch equal
-    branch!(bne,  0b001, (|rs1,rs2| rs1!=rs2)), // Branch not equal
-    branch!(blt,  0b100, (|rs1,rs2| rs1< rs2)), // Branch less than
-    branch!(bge,  0b101, (|rs1,rs2| rs1< rs2)), // Branch less than unsigned
-    branch!(bltu, 0b110, (|rs1,rs2| rs1>=rs2)), // Branch greater or equal
-    branch!(bgeu, 0b111, (|rs1,rs2| rs1>=rs2)), // Branch greater or equal
+    branch!(beq,  0b000, (|vs1,vs2| vs1==vs2)), // Branch equal
+    branch!(bne,  0b001, (|vs1,vs2| vs1!=vs2)), // Branch not equal
+    branch!(blt,  0b100, (|vs1,vs2| vs1< vs2)), // Branch less than
+    branch!(bge,  0b101, (|vs1,vs2| vs1< vs2)), // Branch less than unsigned
+    branch!(bltu, 0b110, (|vs1,vs2| vs1>=vs2)), // Branch greater or equal
+    branch!(bgeu, 0b111, (|vs1,vs2| vs1>=vs2)), // Branch greater or equal
     
     desc(i!(jalr, {
         let prev_pc = vm.cpu.pc+4;
-        vm.cpu.pc += rs1+imm as uguest;
+        let imm: i16 = unsafe {core::mem::transmute(imm)};
+        let (add,overflowed) = vm.cpu.pc.overflowing_add_signed((imm as i64+vs1 as i64)-4);
+        if overflowed {todo!();}
         prev_pc
     }),  _mask(0b1100111, 0b000, 0b0)),
     desc(j!(jal, {
@@ -172,14 +177,14 @@ pub const INSTRUCTIONS: [InstructionDescription; 60] = [
     
     // Atomic Read/Write CSR
     desc(i!(csrrw, {
-        assert_eq!(rs1, 0); // Not supported if non-zero
-        dbg!(rs1,imm,rd);
-        vm.cpu.csr(CsrID::new(imm)).0 = rs1;
+        assert_eq!(rs1, Reg::zero); // Not supported if non-zero
+        // dbg!(vs1,imm,rd);
+        vm.cpu.csr(CsrID::new(imm)).0 = vs1;
         0 // Write 0 to Reg::zero
     }), _mask(0b1110011, 0b001, 0b0)),
     // Atomic Read and Set Bits in CSR
     desc(i!(csrrs, {
-        assert_eq!(rs1, 0); // Not supported if non-zero
+        assert_eq!(rs1, Reg::zero); // Not supported if non-zero
         vm.cpu.csr(CsrID::new(imm)).0
     }), _mask(0b1110011, 0b010, 0b0)),
     // Atomic Read and Clear Bits in CSR
@@ -225,35 +230,35 @@ pub const INSTRUCTIONS: [InstructionDescription; 60] = [
 // todo_instruction!(fencei);
 
 // instruction_i!(addi, {
-//     (rs1+imm as uguest)
+//     (vs1+imm as uguest)
 // });
 // pub fn slli(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     rs1<<rs2
+//     vs1<<vs2
 // }
 // // Set less than immediate
 // pub fn slti(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     if rs1 < rs2 {1} else {0}
+//     if vs1 < vs2 {1} else {0}
 // }
 // pub fn sltiu(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     if rs1 < rs2 {1} else {0}
+//     if vs1 < vs2 {1} else {0}
 // }
 // pub fn xori(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     rs1^rs2
+//     vs1^vs2
 // }
 // pub fn srli(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     rs1>>rs2
+//     vs1>>vs2
 // }
 // pub fn srai(vm: &mut crate::vm::VM, instruction: Instruction) {
 //     todo!()
 // }
 // pub fn ori(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     rs1|rs2
+//     vs1|vs2
 // }
 // pub fn andi(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     rs1&rs2
+//     vs1&vs2
 // }
 // pub fn auipc(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     vm.cpu.pc+(rs1<<12)
+//     vm.cpu.pc+(vs1<<12)
 // }
 // pub fn addiw(vm: &mut crate::vm::VM, instruction: Instruction) {
 //     todo!()
@@ -272,10 +277,10 @@ pub const INSTRUCTIONS: [InstructionDescription; 60] = [
 // //     ($size: ident, $name: ident) => {
 // //         // u64 because we of function signature, but it's a u32 !
 // //         pub fn $name(vm: &mut crate::vm::VM, instruction: u64, _zero: RegValue) -> RegValue {
-// //             let rs2 = *vm.cpu.reg(Reg::new(instruction.get_bits(20..=24) as u8));
+// //             let vs2 = *vm.cpu.reg(Reg::new(instruction.get_bits(20..=24) as u8));
 // //             let imm = (instruction.get_bits(7..=11) | (instruction.get_bits(25..=31) << 5));
-// //             let rs1 = vm.cpu.reg(Reg::new(instruction.get_bits(15..=19) as u8));
-// //             vm.mem.set::<$size>((rs1+imm as uguest), (rs2&($size::MAX as uguest)) as _);
+// //             let vs1 = vm.cpu.reg(Reg::new(instruction.get_bits(15..=19) as u8));
+// //             vm.mem.set::<$size>((vs1+imm as uguest), (vs2&($size::MAX as uguest)) as _);
 // //             0
 // //         }
 // //     };
@@ -290,7 +295,7 @@ pub const INSTRUCTIONS: [InstructionDescription; 60] = [
 // macro_rules! op {
 //     ($name: ident, $op: expr) => {
 //         pub fn $name(vm: &mut crate::vm::VM, instruction: Instruction) {
-//             $op(rs1,rs2)
+//             $op(vs1,vs2)
 //         }
 //     };
 // }
@@ -301,7 +306,7 @@ pub const INSTRUCTIONS: [InstructionDescription; 60] = [
 // todo_instruction!(sltu);
 // op!(xor, core::ops::BitXor::bitxor);
 // op!(srl, core::ops::Shr::shr);
-// todo_instruction!(sra); // rs1>>>rs2
+// todo_instruction!(sra); // vs1>>>vs2
 // op!(or, core::ops::BitOr::bitor);
 // op!(and, core::ops::BitAnd::bitand);
 
@@ -316,21 +321,21 @@ pub const INSTRUCTIONS: [InstructionDescription; 60] = [
 // //         // See $op
 // //         pub fn $name(vm: &mut crate::vm::VM, instruction: u32) {
 // //             let imm = (instruction.get_bits(8..=11)<<1) | (instruction.get_bits(25..=30) << 4) | ((instruction & (1<<7))<<11) | ((instruction & (1<<31))<<12);
-// //             let rs1 = instruction.get_bits(15..=19);
-// //             let rs2 = instruction.get_bits(20..=24);
-// //             if $op(rs1,rs2) {
-// //                 vm.cpu.pc += rs2
+// //             let vs1 = instruction.get_bits(15..=19);
+// //             let vs2 = instruction.get_bits(20..=24);
+// //             if $op(vs1,vs2) {
+// //                 vm.cpu.pc += vs2
 // //             }
 // //             0
 // //         }
 // //     };
 // // }
-// branch!(beq,  |rs1,rs2|rs1==rs2); // Branch equal
-// branch!(bne,  |rs1,rs2|rs1!=rs2); // Branch not equal
-// branch!(blt,  |rs1,rs2|rs1<rs2);  // Branch less than
-// branch!(bltu, |rs1,rs2|rs1<rs2);  // Branch less than unsigned
-// branch!(bge,  |rs1,rs2|rs1>=rs2); // Branch greater or equal
-// branch!(bgeu, |rs1,rs2|rs1>=rs2); // Branch greater or equal
+// branch!(beq,  |vs1,vs2|vs1==vs2); // Branch equal
+// branch!(bne,  |vs1,vs2|vs1!=vs2); // Branch not equal
+// branch!(blt,  |vs1,vs2|vs1<vs2);  // Branch less than
+// branch!(bltu, |vs1,vs2|vs1<vs2);  // Branch less than unsigned
+// branch!(bge,  |vs1,vs2|vs1>=vs2); // Branch greater or equal
+// branch!(bgeu, |vs1,vs2|vs1>=vs2); // Branch greater or equal
 
 
 // // Jump and Link Register
@@ -338,13 +343,13 @@ pub const INSTRUCTIONS: [InstructionDescription; 60] = [
 // pub fn jalr(vm: &mut crate::vm::VM, instruction: Instruction) {
 //     let pc = &mut vm.cpu.pc;
 //     let rd = *pc+4; // Address of next instruction
-//     *pc = rs1+rs2-4; // -4 because we add 4 at the end of execution
+//     *pc = vs1+vs2-4; // -4 because we add 4 at the end of execution
 //     rd
 // }
 // pub fn jal(vm: &mut crate::vm::VM, instruction: Instruction) {
 //     let pc = &mut vm.cpu.pc;
 //     let rd = *pc+4; // Address of next instruction
-//     *pc = pc.overflowing_add_signed(rs2 as iguest-4).0;
+//     *pc = pc.overflowing_add_signed(vs2 as iguest-4).0;
 //     rd
 // }
 // pub fn ecall(vm: &mut crate::vm::VM, instruction: Instruction) {
@@ -360,7 +365,7 @@ pub const INSTRUCTIONS: [InstructionDescription; 60] = [
 // }
 // pub fn csrrs(vm: &mut crate::vm::VM, instruction: u64, csr: RegValue) -> RegValue {
 //     let inst = Instruction(instruction as _);
-//     if inst.rs1() != Reg::zero {todo!()}
+//     if inst.vs1() != Reg::zero {todo!()}
 //     vm.cpu.csrs[csr as usize].0
 // }
 // pub fn csrrc(vm: &mut crate::vm::VM, instruction: u64, csr: RegValue) -> RegValue {
@@ -379,7 +384,7 @@ pub const INSTRUCTIONS: [InstructionDescription; 60] = [
 //     let inst = Instruction(instruction as _);
 //     todo!()
 // }
-// // U-Format, so the immediate is stored in rs1
+// // U-Format, so the immediate is stored in vs1
 // pub fn lui(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     rs1
+//     vs1
 // }

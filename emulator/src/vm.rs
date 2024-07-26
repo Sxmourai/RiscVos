@@ -44,7 +44,7 @@ impl VM {
             self.cpu.pc += core::mem::size_of::<Instruction>() as uguest;
             *self.cpu.reg(Reg::zero) = 0; // Currently we need to set it manually
             #[cfg(debug_assertions)]
-            std::thread::sleep(std::time::Duration::from_millis(500));
+            std::thread::sleep(std::time::Duration::from_millis(100));
         }
         dbg!(&self.cpu);
         Ok(())

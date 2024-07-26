@@ -35,8 +35,8 @@ pub fn instruction_r(input: TokenStream) -> TokenStream {
     quote! {
         (stringify!(#name),InstructionFormat::R, |vm, instruction| {
             let (rs1, rs2, rd) = instruction.parse_r();
-            let rs2 = *vm.cpu.reg(rs2);
-let rs1 = *vm.cpu.reg(rs1);
+            let vs2 = *vm.cpu.reg(rs2);
+let vs1 = *vm.cpu.reg(rs1);
 *vm.cpu.reg(rd) = #code
         })
     }.into()
@@ -49,7 +49,7 @@ pub fn instruction_i(input: TokenStream) -> TokenStream {
     quote! {
         (stringify!(#name),InstructionFormat::I, |vm, instruction| {
             let (imm, rs1, rd) = instruction.parse_i();
-            let rs1 = *vm.cpu.reg(rs1);
+            let vs1 = *vm.cpu.reg(rs1);
 *vm.cpu.reg(rd) = #code
         })
     }.into()
@@ -62,8 +62,8 @@ pub fn instruction_s(input: TokenStream) -> TokenStream {
     quote! {
         (stringify!(#name),InstructionFormat::S, |vm, instruction| {
             let (imm, rs1, rs2) = instruction.parse_s();
-            let rs2 = *vm.cpu.reg(rs2);
-let rs1 = *vm.cpu.reg(rs1);
+            let vs2 = *vm.cpu.reg(rs2);
+let vs1 = *vm.cpu.reg(rs1);
 #code
         })
     }.into()
@@ -76,8 +76,8 @@ pub fn instruction_b(input: TokenStream) -> TokenStream {
     quote! {
         (stringify!(#name),InstructionFormat::B, |vm, instruction| {
             let (imm, rs1, rs2) = instruction.parse_b();
-            let rs2 = *vm.cpu.reg(rs2);
-let rs1 = *vm.cpu.reg(rs1);
+            let vs2 = *vm.cpu.reg(rs2);
+let vs1 = *vm.cpu.reg(rs1);
 #code
         })
     }.into()

@@ -74,7 +74,7 @@ impl MemoryMap for MemMap {
             // Self::ImsicS => VIRT_IMSIC_MAX_SIZE,
             // Self::PcieEcam => 0x10000000,
             // Self::PcieMmio => 0x40000000,
-            Self::DRAM => uguest::MAX-Self::DRAM.base(), // Dynamic size
+            Self::DRAM => uguest::MAX-Self::DRAM.base(), // Max size
             _ => todo!(),
         }
     }
@@ -137,14 +137,9 @@ impl MemoryRegion for DRAM {
     }
     
     unsafe fn write_bytes(&mut self, offset: uguest, buffer: &mut [u8]) {
-        if offset+buffer.len() as uguest>=self.len() {
-            return todo!();
-            let separation = (self.len() as iguest)-offset as iguest;
-            if separation > 0 {
-
-            } else {
-
-            }
+        if offset+buffer.len() as uguest>=self.inner.borrow().len() as uguest {
+            self.inner.borrow_mut().append(&mut vec![0u8; buffer.len()]);
+            dbg!(self.inner.borrow().len());
         }
         self.inner.borrow_mut()[offset as usize..offset as usize+buffer.len()].copy_from_slice(buffer)
     }
