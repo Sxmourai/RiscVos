@@ -146,12 +146,6 @@ pub const INSTRUCTIONS: [InstructionDescription; 60] = [
     desc(r!(srllw, {todo!()}), _mask(0b0111011, 0b101, 0b0000000)),
     desc(r!(sraw, {todo!()}),  _mask(0b0111011, 0b101, 0b0100000)),
     
-// branch!(beq,  |rs1,rs2|rs1==rs2); 
-// branch!(bne,  |rs1,rs2|rs1!=rs2); 
-// branch!(blt,  |rs1,rs2|rs1<rs2);  
-// branch!(bltu, |rs1,rs2|rs1<rs2);  
-// branch!(bge,  |rs1,rs2|rs1>=rs2); 
-// branch!(bgeu, |rs1,rs2|rs1>=rs2); 
     branch!(beq,  0b000, (|rs1,rs2| rs1==rs2)), // Branch equal
     branch!(bne,  0b001, (|rs1,rs2| rs1!=rs2)), // Branch not equal
     branch!(blt,  0b100, (|rs1,rs2| rs1< rs2)), // Branch less than
@@ -164,9 +158,12 @@ pub const INSTRUCTIONS: [InstructionDescription; 60] = [
         vm.cpu.pc += rs1+imm as uguest;
         prev_pc
     }),  _mask(0b1100111, 0b000, 0b0)),
-    desc(u!(jal, {
+    desc(j!(jal, {
         let prev_pc = vm.cpu.pc+4;
-        vm.cpu.pc += imm as uguest;
+        let imm: i16 = unsafe {core::mem::transmute(imm)};
+        let (add,overflowed) = vm.cpu.pc.overflowing_add_signed(imm as i64-4);
+        if overflowed {todo!();}
+        vm.cpu.pc = add;
         prev_pc
     }),   _mask(0b1101111, 0b0, 0b0)),
     

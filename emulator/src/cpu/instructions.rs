@@ -1,15 +1,15 @@
-use color_eyre::{Report, Result};
+use color_eyre::{eyre::ContextCompat, Report, Result};
 use std::cell::OnceCell;
 use bit_field::BitField;
 use super::{raw_instructions::*, reg::Reg, CPU};
 
 
-pub fn get_from_opcode(opcode:u8) -> &'static Vec<InstructionDescription> {
-    unsafe{&REVERSE_INSTRUCTIONS_MASKS.get().unwrap()[opcode as usize]}
+pub fn get_from_opcode(opcode:u8) -> Option<&'static Vec<InstructionDescription>> {
+    unsafe{REVERSE_INSTRUCTIONS_MASKS.get()?.get(opcode as usize)}
 }
 pub fn try_find_instruction_desc(inst: Instruction) -> Result<InstructionDescription> {
     let opcode = inst.opcode();
-    let neighbors = get_from_opcode(opcode);
+    let neighbors = get_from_opcode(opcode).context("Can't find opcode")?;
     if neighbors.is_empty() {return Err(color_eyre::Report::msg(format!("Invalid opcode ({opcode}, {inst:?})")));}
     let fmt = neighbors[0].1;
     for (_name, _fmt, mask, fun) in neighbors {
