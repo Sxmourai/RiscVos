@@ -21,6 +21,7 @@ impl VM {
     
     pub fn run(&mut self) -> color_eyre::Result<()> {
         loop {
+            print!("{:x}", self.cpu.pc);
             // Fetch
             let raw_instruction = self.mem.get::<u32>(self.cpu.pc).context("Out of bounds")?;
             if raw_instruction == 0 {
@@ -29,7 +30,7 @@ impl VM {
             }
             let instruction = Instruction::new(raw_instruction).context("The program didn't enter in a end-loop ! This would've led to UB")?;
             // Execute
-            println!("{}\t - ", instruction);
+            println!(" - {}", instruction);
             let (_name, _fmt, _mask, fun) = crate::cpu::instructions::find_instruction_desc(instruction);
 
             fun(self, instruction);

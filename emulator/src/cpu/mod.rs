@@ -1,7 +1,6 @@
 use std::fmt::Debug;
 
 use csr::{CsrID, CsrValue};
-use instructions::Instruction;
 use mem::MemoryMap;
 
 use crate::*;

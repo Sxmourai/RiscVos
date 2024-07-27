@@ -7,13 +7,13 @@ use super::{raw_instructions::*, reg::Reg, CPU};
 pub fn get_from_opcode(opcode:u8) -> Option<&'static Vec<InstructionDescription>> {
     unsafe{REVERSE_INSTRUCTIONS_MASKS.get()?.get(opcode as usize)}
 }
-pub fn try_find_instruction_desc(inst: Instruction) -> Result<InstructionDescription> {
+pub fn try_find_instruction_desc(inst: Instruction32) -> Result<InstructionDescription> {
     let opcode = inst.opcode();
     let neighbors = get_from_opcode(opcode).context("Can't find opcode")?;
     if neighbors.is_empty() {return Err(color_eyre::Report::msg(format!("Invalid opcode ({opcode}, {inst:?})")));}
     let fmt = neighbors[0].1;
     for (_name, _fmt, mask, fun) in neighbors {
-        let mi = Instruction(mask.0);
+        let mi = Instruction32(mask.0);
         if match fmt {
             InstructionFormat::R => {mi.fun3() == inst.fun3() && mi.fun7() == inst.fun7()},
             InstructionFormat::I => {mi.fun3() == inst.fun3()},
@@ -27,7 +27,7 @@ pub fn try_find_instruction_desc(inst: Instruction) -> Result<InstructionDescrip
     }
     Err(Report::msg(format!("Didn't find instruction description: {:b}", inst.0)))
 }
-pub fn find_instruction_desc(inst: Instruction) -> InstructionDescription {
+pub fn find_instruction_desc(inst: Instruction32) -> InstructionDescription {
     try_find_instruction_desc(inst).unwrap()
 }
 
@@ -36,7 +36,7 @@ pub static mut REVERSE_INSTRUCTIONS_MASKS: OnceCell<_ReverseInstructionsMasks> =
 pub fn set_instructions_funcs() {
     let mut instru_funcs: _ReverseInstructionsMasks = std::array::from_fn(|_| Vec::new());
     for (name, format, mask, fun) in INSTRUCTIONS.iter() {
-        let opcode = Instruction(mask.0).opcode();
+        let opcode = Instruction32(mask.0).opcode();
         instru_funcs[opcode as usize].push((name, *format, *mask, *fun));
     }
     unsafe{REVERSE_INSTRUCTIONS_MASKS.set(instru_funcs).unwrap()}
@@ -45,8 +45,8 @@ pub fn set_instructions_funcs() {
 
 
 #[derive(Clone, Copy)]
-pub struct Instruction(pub u32);
-impl Instruction {
+pub struct Instruction32(pub u32);
+impl Instruction32 {
     pub fn new(inst: u32) -> Result<Self> {
         let s = Self(inst);
         try_find_instruction_desc(s)?;
@@ -164,12 +164,12 @@ impl Instruction {
         }
     }
 }
-impl std::fmt::Debug for Instruction {
+impl std::fmt::Debug for Instruction32 {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> { 
         fmt.write_str(&format!("{:b} {:b} {:b} {:b}", self.opcode(), self.fun3(), self.fun7(), self.0))
     }
 }
-impl std::fmt::Display for Instruction {
+impl std::fmt::Display for Instruction32 {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         let (s1, has_s2) = self.s1();
         let s2 = if has_s2 {self.s2()} else {Destination::Immediate(0)};
@@ -200,8 +200,8 @@ impl std::fmt::Display for Destination {
 // impl InstructionMask {
 //     // Returns true if the mask corresponds to the same instruction
 //     // Like if opcode is same, fun3 and fun7 if there is one
-//     pub fn is_mask(self, instruction: Instruction) -> bool {
-//         let s = Instruction(self.0);
+//     pub fn is_mask(self, instruction: Instruction32) -> bool {
+//         let s = Instruction32(self.0);
 //         if instruction.opcode() == s.opcode() {
 //             return match instruction.format() {
 //                 InstructionFormat::R => {s.fun3() == instruction.fun3() && s.fun7() == instruction.fun7()},

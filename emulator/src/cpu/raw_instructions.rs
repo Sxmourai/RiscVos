@@ -88,6 +88,9 @@ pub enum InstructionFormat {
 }
 pub type InstructionFunction = fn(&mut crate::vm::VM, super::instructions::Instruction);
 pub type InstructionDescription = (&'static str, InstructionFormat, InstructionMask, InstructionFunction);
+/// Based on
+/// Chapter 34. RV32/64G Instruction Set Listings
+/// And https://www.eg.bucknell.edu/~csci206/riscv-converter/Annotated_RISCV_Card.pdf at beginning
 pub const INSTRUCTIONS: [InstructionDescription; 60] = [
     load!(u8,  lb, 0),
     load!(u16, lh, 1),
@@ -172,15 +175,32 @@ pub const INSTRUCTIONS: [InstructionDescription; 60] = [
         prev_pc
     }),   _mask(0b1101111, 0b0, 0b0)),
     
-    desc(i!(ecall,  {todo!()}), _mask(0b1110011, 0b0, 0b0)), // Immediates (fun7)
+    desc(i!(ecall,  {
+        dbg!(imm, rs1, rd);
+        match imm {
+            0 => {
+                todo!("ECALL")
+            },
+            1 => {
+                todo!("EBREAK")
+            },
+            0x302 => { // MRET
+                let mepc = crate::csr!(vm, mepc);
+                println!("MRET");
+                vm.cpu.pc = mepc.0;
+                0
+            },
+            _ => {todo!("Invalid instruction {:?}", instruction.0)}
+        }
+    }), _mask(0b1110011, 0b0, 0b0)), // Immediates (fun7)
     desc(i!(ebreak, {todo!()}), _mask(0b1110011, 0b0, 0b1)),
     
     // Atomic Read/Write CSR
     desc(i!(csrrw, {
-        assert_eq!(rs1, Reg::zero); // Not supported if non-zero
-        // dbg!(vs1,imm,rd);
+        let old = *vm.cpu.csr(CsrID::new(imm));
+        println!("{}", CsrID::new(imm));
         vm.cpu.csr(CsrID::new(imm)).0 = vs1;
-        0 // Write 0 to Reg::zero
+        old.0
     }), _mask(0b1110011, 0b001, 0b0)),
     // Atomic Read and Set Bits in CSR
     desc(i!(csrrs, {
