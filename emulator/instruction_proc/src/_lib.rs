@@ -6,13 +6,13 @@ use syn::{parse::{Parse, ParseStream}, parse_macro_input, Ident, Token};
 
 extern crate proc_macro;
 
-struct Instruction {
+struct InstructionMacro {
     name: Ident,
     code: syn::Block,
 }
 
 // Implement the Parse trait to parse the macro input
-impl Parse for Instruction {
+impl Parse for InstructionMacro {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let name = input.parse()?;
         // Parse the comma

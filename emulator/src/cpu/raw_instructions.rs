@@ -1,6 +1,9 @@
 // Big thanks to https://www.eg.bucknell.edu/~csci206/riscv-converter/Annotated_RISCV_Card.pdf
 // For more info about instructions https://projectf.io/posts/riscv-cheat-sheet/
 
+use std::cell::OnceCell;
+
+use color_eyre::Report;
 use instruction_proc::instruction_r as r;
 use instruction_proc::instruction_i as i;
 use instruction_proc::instruction_s as s;
@@ -20,10 +23,14 @@ use crate::cpu::reg::Reg;
 use crate::uguest;
 use crate::cpu::CsrID;
 
+use super::instructions::Instruction32;
+
+use color_eyre::Result;
+
 const fn _mask(opcode: u32, fun3: u32, fun7: u32) -> InstructionMask {
     InstructionMask(opcode | fun3 << 12 | fun7 << 25)
 }
-const fn desc(macro_out: (&'static str, InstructionFormat, InstructionFunction), mask: InstructionMask) -> InstructionDescription {
+const fn desc(macro_out: (&'static str, Instruction32Format, InstructionFunction32), mask: InstructionMask) -> InstructionDescription32 {
     (macro_out.0, macro_out.1, mask, macro_out.2)
 }
 
@@ -81,17 +88,34 @@ fn panic(a: uguest, b: uguest) -> uguest {
 
 
 #[derive(Clone, Copy, Debug)]
-pub struct InstructionMask(pub u32);
+pub struct Instruction32Mask(pub u32);
+#[derive(Clone, Copy, Debug)]
+pub struct Instruction16Mask(pub u16);
 #[derive(Debug, Clone, Copy)]
-pub enum InstructionFormat {
+pub enum Instruction32Format {
     R,I,S,B,U,J,
 }
-pub type InstructionFunction = fn(&mut crate::vm::VM, super::instructions::Instruction);
-pub type InstructionDescription = (&'static str, InstructionFormat, InstructionMask, InstructionFunction);
+#[derive(Debug, Clone, Copy)]
+pub enum Instruction16Format {
+    CR,  // Register
+    CI,  // Immediate
+    CSS, // Stack-relative Store
+    CIW, // Wide Immediate
+    CL,  // Load
+    CS,  // Store
+    CA,  // Arithmetic
+    CB,  // Branch/Arithmetic
+    CJ,  // Jump
+}
+pub type InstructionFunction32 = fn(&mut crate::vm::VM, super::instructions::Instruction32);
+pub type InstructionDescription32 = (&'static str, Instruction32Format, Instruction32Mask, InstructionFunction32);
+pub type InstructionFunction16 = fn(&mut crate::vm::VM, super::instructions::Instruction16);
+pub type InstructionDescription16 = (&'static str, Instruction16Format, Instruction16Mask, InstructionFunction16);
+
 /// Based on
 /// Chapter 34. RV32/64G Instruction Set Listings
 /// And https://www.eg.bucknell.edu/~csci206/riscv-converter/Annotated_RISCV_Card.pdf at beginning
-pub const INSTRUCTIONS: [InstructionDescription; 60] = [
+pub const INSTRUCTIONS32: [InstructionDescription32; 60] = [
     load!(u8,  lb, 0),
     load!(u16, lh, 1),
     load!(u32, lw, 2),
@@ -215,196 +239,45 @@ pub const INSTRUCTIONS: [InstructionDescription; 60] = [
     desc(i!(csrrci,{todo!()}), _mask(0b1110011, 0b111, 0b0)),
 ];
 
+pub enum InstructionDescription {
+    Base(InstructionDescription32),
+    Compressed(InstructionDescription16),
+}
 
-// use bit_field::BitField;
+pub fn get_from_opcode(opcode:u8) -> Option<&'static Vec<InstructionDescription>> {
+    unsafe{REVERSE_INSTRUCTIONS_MASKS.get()?.get(opcode as usize)}
+}
+pub fn try_find_instruction32_desc(inst: Instruction32) -> Result<InstructionDescription> {
+    let opcode = inst.opcode();
+    let neighbors = get_from_opcode(opcode).context("Can't find opcode")?;
+    if neighbors.is_empty() {return Err(color_eyre::Report::msg(format!("Invalid opcode ({opcode}, {inst:?})")));}
+    let fmt = neighbors[0].1;
+    for (_name, _fmt, mask, fun) in neighbors {
+        let mi = Instruction32(mask.0);
+        if match fmt {
+            Instruction32Format::R => {mi.fun3() == inst.fun3() && mi.fun7() == inst.fun7()},
+            Instruction32Format::I => {mi.fun3() == inst.fun3()},
+            Instruction32Format::S => {mi.fun3() == inst.fun3()},
+            Instruction32Format::B => {mi.fun3() == inst.fun3()},
+            Instruction32Format::U => {true},
+            Instruction32Format::J => {true},
+        } {
+            return Ok((_name, fmt, *mask, *fun))
+        }
+    }
+    Err(Report::msg(format!("Didn't find instruction description: {:b}", inst.0)))
+}
+pub fn find_instruction32_desc(inst: Instruction32) -> InstructionDescription32 {
+    try_find_instruction32_desc(inst).unwrap()
+}
 
-// use crate::{cpu::reg::Reg, uguest};
-
-// use super::{iguest, instructions::Instruction, reg::RegValue, CPU};
-
-// macro_rules! todo_instruction {
-//     ($name:ident) => {
-//         pub fn $name(vm: &mut crate::vm::VM, instruction: Instruction) {
-//             todo!()
-//         }
-//     };
-// }
-
-
-// load!(u8, lb);
-// load!(u16,lh);
-// load!(u32, lw);
-// load!(u64, ld);
-// macro_rules! load_unsigned {
-//     ($size: ty,$name: ident) => {
-//         todo_instruction!($name);
-//     };
-// }
-
-// load_unsigned!(u8, lbu);
-// load_unsigned!(u16, lhu);
-// load_unsigned!(u32, lwu);
-// load_unsigned!(u64, ldu);
-
-// todo_instruction!(fence);
-// todo_instruction!(fencei);
-
-// instruction_i!(addi, {
-//     (vs1+imm as uguest)
-// });
-// pub fn slli(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     vs1<<vs2
-// }
-// // Set less than immediate
-// pub fn slti(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     if vs1 < vs2 {1} else {0}
-// }
-// pub fn sltiu(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     if vs1 < vs2 {1} else {0}
-// }
-// pub fn xori(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     vs1^vs2
-// }
-// pub fn srli(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     vs1>>vs2
-// }
-// pub fn srai(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     todo!()
-// }
-// pub fn ori(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     vs1|vs2
-// }
-// pub fn andi(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     vs1&vs2
-// }
-// pub fn auipc(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     vm.cpu.pc+(vs1<<12)
-// }
-// pub fn addiw(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     todo!()
-// }
-// pub fn slliw(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     todo!()
-// }
-// pub fn srliw(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     todo!()
-// }
-// pub fn sraiw(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     todo!()
-// }
-
-// // macro_rules! store {
-// //     ($size: ident, $name: ident) => {
-// //         // u64 because we of function signature, but it's a u32 !
-// //         pub fn $name(vm: &mut crate::vm::VM, instruction: u64, _zero: RegValue) -> RegValue {
-// //             let vs2 = *vm.cpu.reg(Reg::new(instruction.get_bits(20..=24) as u8));
-// //             let imm = (instruction.get_bits(7..=11) | (instruction.get_bits(25..=31) << 5));
-// //             let vs1 = vm.cpu.reg(Reg::new(instruction.get_bits(15..=19) as u8));
-// //             vm.mem.set::<$size>((vs1+imm as uguest), (vs2&($size::MAX as uguest)) as _);
-// //             0
-// //         }
-// //     };
-// // }
-
-// // store!(u8,  sb);
-// // store!(u16, sh);
-// // store!(u32, sw);
-// // store!(u64, sd);
-
-
-// macro_rules! op {
-//     ($name: ident, $op: expr) => {
-//         pub fn $name(vm: &mut crate::vm::VM, instruction: Instruction) {
-//             $op(vs1,vs2)
-//         }
-//     };
-// }
-// op!(add, core::ops::Add::add);
-// op!(sub, core::ops::Sub::sub);
-// op!(sll, core::ops::Shl::shl);
-// todo_instruction!(slt);
-// todo_instruction!(sltu);
-// op!(xor, core::ops::BitXor::bitxor);
-// op!(srl, core::ops::Shr::shr);
-// todo_instruction!(sra); // vs1>>>vs2
-// op!(or, core::ops::BitOr::bitor);
-// op!(and, core::ops::BitAnd::bitand);
-
-// op!(addw, core::ops::Add::add);
-// op!(subw, core::ops::Sub::sub);
-// op!(sllw, core::ops::Shl::shl);
-// todo_instruction!(srllw);
-// todo_instruction!(sraw);
-
-// // macro_rules! branch {
-// //     ($name:ident, $op: expr) => {
-// //         // See $op
-// //         pub fn $name(vm: &mut crate::vm::VM, instruction: u32) {
-// //             let imm = (instruction.get_bits(8..=11)<<1) | (instruction.get_bits(25..=30) << 4) | ((instruction & (1<<7))<<11) | ((instruction & (1<<31))<<12);
-// //             let vs1 = instruction.get_bits(15..=19);
-// //             let vs2 = instruction.get_bits(20..=24);
-// //             if $op(vs1,vs2) {
-// //                 vm.cpu.pc += vs2
-// //             }
-// //             0
-// //         }
-// //     };
-// // }
-// branch!(beq,  |vs1,vs2|vs1==vs2); // Branch equal
-// branch!(bne,  |vs1,vs2|vs1!=vs2); // Branch not equal
-// branch!(blt,  |vs1,vs2|vs1<vs2);  // Branch less than
-// branch!(bltu, |vs1,vs2|vs1<vs2);  // Branch less than unsigned
-// branch!(bge,  |vs1,vs2|vs1>=vs2); // Branch greater or equal
-// branch!(bgeu, |vs1,vs2|vs1>=vs2); // Branch greater or equal
-
-
-// // Jump and Link Register
-
-// pub fn jalr(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     let pc = &mut vm.cpu.pc;
-//     let rd = *pc+4; // Address of next instruction
-//     *pc = vs1+vs2-4; // -4 because we add 4 at the end of execution
-//     rd
-// }
-// pub fn jal(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     let pc = &mut vm.cpu.pc;
-//     let rd = *pc+4; // Address of next instruction
-//     *pc = pc.overflowing_add_signed(vs2 as iguest-4).0;
-//     rd
-// }
-// pub fn ecall(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     todo!()
-// }
-// pub fn ebreak(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     todo!()
-// }
-// pub fn csrrw(vm: &mut crate::vm::VM, instruction: u64, csr: RegValue) -> RegValue {
-//     let inst = Instruction(instruction as _);
-//     dbg!(inst,csr);
-//     todo!()
-// }
-// pub fn csrrs(vm: &mut crate::vm::VM, instruction: u64, csr: RegValue) -> RegValue {
-//     let inst = Instruction(instruction as _);
-//     if inst.vs1() != Reg::zero {todo!()}
-//     vm.cpu.csrs[csr as usize].0
-// }
-// pub fn csrrc(vm: &mut crate::vm::VM, instruction: u64, csr: RegValue) -> RegValue {
-//     let inst = Instruction(instruction as _);
-//     todo!()
-// }
-// pub fn csrrwi(vm: &mut crate::vm::VM, instruction: u64, csr: RegValue) -> RegValue {
-//     let inst = Instruction(instruction as _);
-//     todo!()
-// }
-// pub fn csrrsi(vm: &mut crate::vm::VM, instruction: u64, csr: RegValue) -> RegValue {
-//     let inst = Instruction(instruction as _);
-//     todo!()
-// }
-// pub fn csrrci(vm: &mut crate::vm::VM, instruction: u64, csr: RegValue) -> RegValue {
-//     let inst = Instruction(instruction as _);
-//     todo!()
-// }
-// // U-Format, so the immediate is stored in vs1
-// pub fn lui(vm: &mut crate::vm::VM, instruction: Instruction) {
-//     vs1
-// }
+type _ReverseInstructionsMasks = [Vec<InstructionDescription32>; 127];
+pub static mut REVERSE_INSTRUCTIONS_MASKS: OnceCell<_ReverseInstructionsMasks> = OnceCell::new();
+pub fn set_instructions_funcs() {
+    let mut instru_funcs: _ReverseInstructionsMasks = std::array::from_fn(|_| Vec::new());
+    for (name, format, mask, fun) in INSTRUCTIONS32.iter() {
+        let opcode = Instruction32(mask.0).opcode();
+        instru_funcs[opcode as usize].push((name, *format, *mask, *fun));
+    }
+    unsafe{REVERSE_INSTRUCTIONS_MASKS.set(instru_funcs).unwrap()}
+}

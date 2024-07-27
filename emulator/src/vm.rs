@@ -1,7 +1,7 @@
 // We can now access cpu registers using zero, s0, a0 etc... See cpu/reg.rs 
 use crate::cpu::reg::Reg;
 use color_eyre::eyre::{Context, ContextCompat};
-use cpu::instructions::get_from_opcode;
+use cpu::instructions::{get_from_opcode, Instruction16};
 
 use crate::*;
 use crate::cpu::instructions::Instruction;
@@ -28,21 +28,34 @@ impl VM {
                 println!("Didn't enter in loop !");
                 return Ok(()) // Don't pollute stdout, for now
             }
-            let instruction = Instruction::new(raw_instruction).context("The program didn't enter in a end-loop ! This would've led to UB")?;
-            // Execute
-            println!(" - {}", instruction);
-            let (_name, _fmt, _mask, fun) = crate::cpu::instructions::find_instruction_desc(instruction);
+            let instructions = Instruction::new(raw_instruction).context("The program didn't enter in a end-loop ! This would've led to UB")?;
+            if let Some(fst) = instructions.1 {
+                let snd = match instructions.0 {
+                    Instruction::Base(_) => unreachable!(),
+                    Instruction::Compressed(c) => c,
+                };
 
-            fun(self, instruction);
-
-            // println!("{}={}\t{}={}\t-> {}={}", inst.s1().0,s1,inst.s2(),s2,inst.destination(),d);
-            // match instruction.destination() {
-            //     crate::cpu::instructions::Destination::CpuRegister(reg) => *self.cpu.reg(reg) = d,
-            //     crate::cpu::instructions::Destination::Immediate(imm) => {
-            //         self.mem.set::<_>(imm as _, d).unwrap()
-            //     }
-            // };
-            self.cpu.pc += core::mem::size_of::<Instruction>() as uguest;
+                // Execute
+                println!(" - {}", fst);
+                let (_name, _fmt, _mask, fun) = crate::cpu::instructions::find_instruction16_desc(fst);
+                fun(self, fst);
+                self.cpu.pc += core::mem::size_of::<Instruction16>() as uguest;
+                *self.cpu.reg(Reg::zero) = 0; // Currently we need to set it manually
+                println!(" - {}", snd);
+                let (_name, _fmt, _mask, fun) = crate::cpu::instructions::find_instruction16_desc(snd);
+                fun(self, snd);
+                self.cpu.pc += core::mem::size_of::<Instruction16>() as uguest;
+            } else {
+                let instruction = match instructions.0 {
+                    Instruction::Base(b) => b,
+                    Instruction::Compressed(_) => unreachable!(),
+                };
+                // Execute
+                println!(" - {}", instruction);
+                let (_name, _fmt, _mask, fun) = crate::cpu::instructions::find_instruction32_desc(instruction);
+                fun(self, instruction);
+                self.cpu.pc += core::mem::size_of::<Instruction>() as uguest;
+            }
             *self.cpu.reg(Reg::zero) = 0; // Currently we need to set it manually
             #[cfg(debug_assertions)]
             std::thread::sleep(std::time::Duration::from_millis(100));
@@ -50,15 +63,15 @@ impl VM {
         dbg!(&self.cpu);
         Ok(())
     }
-    pub fn disasm(&mut self, program: Vec<u8>) -> color_eyre::Result<()> {
-        for i in (0..program.len()).step_by(core::mem::size_of::<Instruction>()) {
-            // Fetch
-            let instruction = Instruction::new(self.mem.get::<_>(self.cpu.pc).unwrap()).context("The program didn't enter in a end-loop ! This would've led to UB")?;
-            // Execute
-            println!("{}\t - ", instruction);
-        }
-        Ok(())
-    }
+    // pub fn disasm(&mut self, program: Vec<u8>) -> color_eyre::Result<()> {
+    //     for i in (0..program.len()).step_by(core::mem::size_of::<Instruction>()) {
+    //         // Fetch
+    //         let instruction = Instruction::new(self.mem.get::<_>(self.cpu.pc).unwrap()).context("The program didn't enter in a end-loop ! This would've led to UB")?;
+    //         // Execute
+    //         println!("{}\t - ", instruction);
+    //     }
+    //     Ok(())
+    // }
 }
 
 pub fn run(program: Vec<u8>) {

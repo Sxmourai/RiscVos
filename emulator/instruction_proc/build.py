@@ -14,10 +14,10 @@ def gen_func(ty: str, args: str):
     code = f"""
 #[proc_macro]
 pub fn {macro_name}(input: TokenStream) -> TokenStream {{
-    let Instruction {{ name, code }} = parse_macro_input!(input as _);
+    let InstructionMacro {{ name, code }} = parse_macro_input!(input as _);
 
     quote! {{
-        (stringify!(#name),InstructionFormat::{ty}, |vm, instruction| {{
+        (stringify!(#name),Instruction32Format::{ty}, |vm, instruction| {{
             let {args} = instruction.{parser}();
             {inner_code}
         }})

@@ -6,13 +6,13 @@ use syn::{parse::{Parse, ParseStream}, parse_macro_input, Ident, Token};
 
 extern crate proc_macro;
 
-struct Instruction {
+struct InstructionMacro {
     name: Ident,
     code: syn::Block,
 }
 
 // Implement the Parse trait to parse the macro input
-impl Parse for Instruction {
+impl Parse for InstructionMacro {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let name = input.parse()?;
         // Parse the comma
@@ -30,10 +30,10 @@ macro_rules! gen_instruction_fmt {
 
 #[proc_macro]
 pub fn instruction_r(input: TokenStream) -> TokenStream {
-    let Instruction { name, code } = parse_macro_input!(input as _);
+    let InstructionMacro { name, code } = parse_macro_input!(input as _);
 
     quote! {
-        (stringify!(#name),InstructionFormat::R, |vm, instruction| {
+        (stringify!(#name),Instruction32Format::R, |vm, instruction| {
             let (rs1, rs2, rd) = instruction.parse_r();
             let vs2 = *vm.cpu.reg(rs2);
 let vs1 = *vm.cpu.reg(rs1);
@@ -44,10 +44,10 @@ let vs1 = *vm.cpu.reg(rs1);
 
 #[proc_macro]
 pub fn instruction_i(input: TokenStream) -> TokenStream {
-    let Instruction { name, code } = parse_macro_input!(input as _);
+    let InstructionMacro { name, code } = parse_macro_input!(input as _);
 
     quote! {
-        (stringify!(#name),InstructionFormat::I, |vm, instruction| {
+        (stringify!(#name),Instruction32Format::I, |vm, instruction| {
             let (imm, rs1, rd) = instruction.parse_i();
             let vs1 = *vm.cpu.reg(rs1);
 *vm.cpu.reg(rd) = #code
@@ -57,10 +57,10 @@ pub fn instruction_i(input: TokenStream) -> TokenStream {
 
 #[proc_macro]
 pub fn instruction_s(input: TokenStream) -> TokenStream {
-    let Instruction { name, code } = parse_macro_input!(input as _);
+    let InstructionMacro { name, code } = parse_macro_input!(input as _);
 
     quote! {
-        (stringify!(#name),InstructionFormat::S, |vm, instruction| {
+        (stringify!(#name),Instruction32Format::S, |vm, instruction| {
             let (imm, rs1, rs2) = instruction.parse_s();
             let vs2 = *vm.cpu.reg(rs2);
 let vs1 = *vm.cpu.reg(rs1);
@@ -71,10 +71,10 @@ let vs1 = *vm.cpu.reg(rs1);
 
 #[proc_macro]
 pub fn instruction_b(input: TokenStream) -> TokenStream {
-    let Instruction { name, code } = parse_macro_input!(input as _);
+    let InstructionMacro { name, code } = parse_macro_input!(input as _);
 
     quote! {
-        (stringify!(#name),InstructionFormat::B, |vm, instruction| {
+        (stringify!(#name),Instruction32Format::B, |vm, instruction| {
             let (imm, rs1, rs2) = instruction.parse_b();
             let vs2 = *vm.cpu.reg(rs2);
 let vs1 = *vm.cpu.reg(rs1);
@@ -85,10 +85,10 @@ let vs1 = *vm.cpu.reg(rs1);
 
 #[proc_macro]
 pub fn instruction_u(input: TokenStream) -> TokenStream {
-    let Instruction { name, code } = parse_macro_input!(input as _);
+    let InstructionMacro { name, code } = parse_macro_input!(input as _);
 
     quote! {
-        (stringify!(#name),InstructionFormat::U, |vm, instruction| {
+        (stringify!(#name),Instruction32Format::U, |vm, instruction| {
             let (imm, rd) = instruction.parse_u();
             *vm.cpu.reg(rd) = #code
         })
@@ -97,10 +97,10 @@ pub fn instruction_u(input: TokenStream) -> TokenStream {
 
 #[proc_macro]
 pub fn instruction_j(input: TokenStream) -> TokenStream {
-    let Instruction { name, code } = parse_macro_input!(input as _);
+    let InstructionMacro { name, code } = parse_macro_input!(input as _);
 
     quote! {
-        (stringify!(#name),InstructionFormat::J, |vm, instruction| {
+        (stringify!(#name),Instruction32Format::J, |vm, instruction| {
             let (imm, rd) = instruction.parse_j();
             *vm.cpu.reg(rd) = #code
         })
