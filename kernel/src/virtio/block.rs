@@ -1,9 +1,61 @@
 use super::*;
 
-pub const SUPPORTED_FEATURES: u32 = !(1 << block::VIRTIO_BLK_F_RO);
+pub const SUPPORTED_FEATURES: u32 = !(BlockFeatures::ReadOnly as u32);
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BlockFeatures {
+    /// Legacy:
+    /// Device supports request barriers.
+    VIRTIO_BLK_F_BARRIER = 1<<0,
+    /// Maximum size of any single segment is in size_max.
+    SIZE_MAX = 1<<1,
+    /// Maximum number of segments in a request is in seg_max.
+    SEG_MAX = 1<<2,
+    /// Disk-style geometry specified in geometry.
+    GEOMETRY = 1<<4,
+    /// Device is read-only.
+    ReadOnly = 1<<5,
+    /// Block size of disk is in blk_size.
+    BLK_SIZE = 1<<6,
+    /// Legacy:
+    /// Device supports scsi packet commands.
+    VIRTIO_BLK_F_SCSI = 1<<7,
+    /// Cache flush command support.
+    FLUSH = 1<<9,
+    /// Device exports information on optimal I/O alignment.
+    TOPOLOGY = 1<<10,
+    /// Device can toggle its cache between writeback and writethrough modes.
+    CONFIG_WCE = 1<<11,
+    /// Device can support discard command, maximum discard sectors size in max_discard_sectors and maximum discard segment number in max_discard_seg.
+    DISCARD = 1<<13,
+    /// Device can support write zeroes command, maximum write zeroes sectors size in max_write_zeroes_sectors and maximum write zeroes segment number in max_write_zeroes_seg.
+    WRITE_ZEROES = 1<<14,
+}
+pub fn dbg_features(f: u32) {
+    let variants = [
+        BlockFeatures::VIRTIO_BLK_F_BARRIER,
+        BlockFeatures::SIZE_MAX,
+        BlockFeatures::SEG_MAX,
+        BlockFeatures::GEOMETRY,
+        BlockFeatures::ReadOnly,
+        BlockFeatures::BLK_SIZE,
+        BlockFeatures::VIRTIO_BLK_F_SCSI,
+        BlockFeatures::FLUSH,
+        BlockFeatures::TOPOLOGY,
+        BlockFeatures::CONFIG_WCE,
+        BlockFeatures::DISCARD,
+        BlockFeatures::WRITE_ZEROES,
+    ];
+    for v in variants {
+        if f & v as u32 != 0 {
+            print!("{:?} ", v);
+        }
+    }
+}
 
 pub fn init_device(mmio: StandardVirtIO) -> Option<VirtIODevicePtr> {
     let blk = block::BlockDevice::new(mmio)?;
+    log::info!("Found disk with size {}kb", blk.config.capacity*blk.config.blk_size as u64/1024);
     Some(VirtIODevicePtr::Block(Box::new(blk)))
 }
 
@@ -11,16 +63,19 @@ pub fn init_device(mmio: StandardVirtIO) -> Option<VirtIODevicePtr> {
 #[derive(Debug)]
 pub struct BlockDevice {
     mmio: StandardVirtIO,
+    config: &'static mut Config,
     queue: Option<&'static mut Queue>,
     queue_idx: usize,
     // pendings: Vec<&'static [u8]>, // Not static, but gonna change it, but lifetime is not the right move for now
 }
 impl BlockDevice {
     pub fn new(mmio: StandardVirtIO) -> Option<Self> {
+        let config = unsafe{&mut *((mmio.base()+MmioOffset::Config as usize) as *mut Config)};
         let mut _s = Self {
             mmio,
             queue: None,
             queue_idx: 0,
+            config,
             // pendings: Vec::new(),
         };
         _s.specific_init()?;
@@ -48,15 +103,15 @@ impl BlockDevice {
         unsafe { self.mmio.write(MmioOffset::QueueSel, 0) };
 
         //TODO Alignment
-        unsafe { self.mmio.write(MmioOffset::GuestPageSize, PAGE_SIZE.try_into().unwrap()) };
+        unsafe { self.mmio.write(MmioOffset::DriverPageSize, PAGE_SIZE.try_into().unwrap()) };
         // QueuePFN is a physical page number, however it
         // appears for QEMU we have to write the entire memory
         // address.
-        let mut addr = kalloc(1).ok()?;
+        let mut addr = kalloc(2).ok()?;
         unsafe {
             let _ = self.queue.replace(&mut *(addr as *mut Queue));
             self.mmio.write(MmioOffset::QueuePfn, (addr as u64 / PAGE_SIZE64) as u32);
-            self.mmio.write(MmioOffset::Status, StatusField::DriverOk | self.mmio.read(MmioOffset::Status));
+            self.mmio.set_driver_status_bit(StatusField::DriverOk);
         }
         Some(())
     }
@@ -64,8 +119,17 @@ impl BlockDevice {
         assert_eq!(buffer.len()%512, 0);
         if self.mmio.read_only && writing {return None;}
         let request = unsafe{&mut *(kmalloc(core::mem::size_of::<Request>()).ok()? as *mut Request)};
+        request.header.sector = sector_offset;
+        request.header.blktype = if writing {VIRTIO_BLK_T_OUT} else {VIRTIO_BLK_T_IN};
+        request.header.reserved = 0;
+        
+        request.data = core::ptr::addr_of!(buffer[0]) as _;
+        // We put 111 in the status. Whenever the device finishes, it will write into
+        // status. If we read status and it is 111, we know that it wasn't written to by
+        // the device.
+        request.status = 111;
         let desc = Descriptor {
-            addr: unsafe { &request.header } as *const Header as u64, // Isn't it zero ?
+            addr: core::ptr::addr_of!(request.header) as u64,
             len:  core::mem::size_of::<Header>() as _,
             flags:VIRTIO_DESC_F_NEXT,
             next: 0,
@@ -73,31 +137,23 @@ impl BlockDevice {
         unsafe {
             self.fill_next_descriptor(desc)?;
         }
-        request.header.sector = sector_offset;
-        request.header.blktype = if writing {VIRTIO_BLK_T_OUT} else {VIRTIO_BLK_T_IN};
-        request.header.reserved = 0;
-        
-        request.data = buffer[0] as *mut _;
-        // We put 111 in the status. Whenever the device finishes, it will write into
-        // status. If we read status and it is 111, we know that it wasn't written to by
-        // the device.
-        request.status = 111; // Not 0b111 but One hundred and one !
-        let head_idx = self.queue_idx;
+
+        let head_idx = self.queue_idx.clone();
 
         let mut flags = VIRTIO_DESC_F_NEXT;
-        if writing {
+        if !writing {
             flags |= VIRTIO_DESC_F_WRITE
         }
         let data_desc = Descriptor { 
-            addr: (buffer[0] as *mut u8) as u64,
-            len:(buffer.len()/512) as u32,
+            addr: core::ptr::addr_of!(buffer[0]) as u64,
+            len: buffer.len() as u32,
             flags,
-            next: 0, 
+            next: 0,
         };
         unsafe {self.fill_next_descriptor(data_desc)}?;
         let data_idx = self.queue_idx;
         let status_desc = Descriptor {
-            addr:  unsafe { &request.status } as *const u8 as u64,
+            addr:  core::ptr::addr_of!(request.status) as u64,
             len:   1,
             flags: VIRTIO_DESC_F_WRITE,
             next:  0, 
@@ -109,11 +165,7 @@ impl BlockDevice {
         queue.avail.idx = (((queue.avail.idx as usize) + 1) % VIRTIO_RING_SIZE) as _;
         // The only queue a block device has is 0, which is the request
         // queue.
-        dbg!(self);
-        for i in 0..100000 {}
         unsafe {self.mmio.write(MmioOffset::QueueNotify, 0);}
-        for i in 0..100000 {}
-        dbg!(self);
         Some(())
     }
     unsafe fn fill_next_descriptor(&mut self, desc: Descriptor) -> Option<()> {
@@ -134,7 +186,6 @@ impl BlockDevice {
     /// Reads size in bytes and returns a vector of the values as T
     pub fn read(&mut self, sector_offset: u64, buffer: &mut [u8]) -> Option<()> {
         self.op(sector_offset, buffer, false)?;
-        dbg!(self.queue);
         Some(())
     }
     
@@ -145,14 +196,22 @@ impl BlockDevice {
 }
 impl VirtIODevice for BlockDevice {
     fn handle_int(&mut self) {
-        dbg!(self.queue_idx, self.queue);
-        dbg!(self);
-        let mut queue = self.queue.as_mut().unwrap();
-        dbg!(queue);
+        let queue = self.queue.as_mut().unwrap();
+        let head_idx = queue.avail.ring[queue.avail.idx as usize-1];
+        let rq_addr = queue.desc[head_idx as usize].addr;
+        let rq = unsafe {&mut *(rq_addr as *mut Request)};
+        match rq.status {
+            0 => {}, // Success
+            1 => {todo!()}, // IO Error
+            2 => {todo!()}, // Unsupported op
+            _ => todo!()
+        };
+        // todo!()
     }
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct Geometry {
 	cylinders: u16,
 	heads:     u8,
@@ -160,6 +219,7 @@ pub struct Geometry {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct Topology {
 	physical_block_exp: u8,
 	alignment_offset:   u8,
@@ -173,6 +233,7 @@ pub struct Topology {
 // block device. Really, all that this OS cares about is the
 // capacity.
 #[repr(C)]
+#[derive(Debug)]
 pub struct Config {
 	capacity:                 u64,
 	size_max:                 u32,
@@ -200,12 +261,14 @@ pub struct Config {
 // in here: 0 = success, 1 = io error, 2 = unsupported
 // operation.
 #[repr(C)]
+#[derive(Debug)]
 pub struct Header {
 	blktype:  u32,
 	reserved: u32,
 	sector:   u64,
 }
 #[repr(C)]
+#[derive(Debug)]
 pub struct Request {
 	header: Header,
 	data:   *mut u8,

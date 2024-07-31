@@ -153,6 +153,7 @@ extern "C" fn mtrap() {
 
 #[no_mangle]
 extern "C" fn strap() {
+    dbg!("STRAP");
     let cause = csrr!("scause", u64);
     let is_interrupt = cause & 1u64<<63 != 0;
     let id = cause & 0xFF;
@@ -382,9 +383,10 @@ pub fn init(callback: usize) {
     unsafe{
         csrw!("mstatus", supervisor_mstatus.0);
         csrw!("satp", 0);
-        // Delegate all interrupts to supervisor mode (so that we only have 1 interrupt handler)
-        // csrw!("medeleg", 0xffff);
+        // csrw!("medeleg", 0x0);
+        // Delegate all async interrupts to supervisor mode (not exceptions for now)
         // csrw!("mideleg", 0xffff);
+        // dbg!(csrr!("mideleg"));
         csrw!("mtvec", m_trap_vector as usize & !(0b11));
         // use Interrupts as Int;(Int::SupervisorTimer as u64) | (Int::SupervisorSoftware as u64) | (Int::SupervisorExternal as u64) |
         // (Int::MachineTimer as u64) | (Int::MachineSoftware as u64) | (Int::MachineExternal as u64)

@@ -40,7 +40,8 @@ pub fn main_loop() {
     };
     let mut buffer = alloc::vec![0u8; 1024];
     blk.read(0, &mut buffer);
-    dbg!(buffer);
+    let read = alloc::string::String::from_utf8(buffer).unwrap();
+    print!("{}", read);
 	loop {
         riscv::wfi()
     }

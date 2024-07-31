@@ -52,9 +52,13 @@ pub fn init() {
         }
     }
 }
+/// Inits a V1 virtio device
 fn init_virt_device(addr: usize, deviceid: u32) -> Option<()> {
     let idx = (addr - VIRTIO_START) / VIRTIO_STRIDE;
     let mut mmio = StandardVirtIO { idx, read_only: false };
+    if mmio.read(MmioOffset::Version) != 1 {
+        todo!()
+    }
     // https://docs.oasis-open.org/virtio/virtio/v1.1/csprd01/virtio-v1.1-csprd01.html#x1-1930005
     let supported_feats = VirtIODevicePtr::supported_features(deviceid);
     init_device(&mut mmio, supported_feats)?;
@@ -161,6 +165,7 @@ pub struct Queue {
 impl core::fmt::Debug for Queue {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Queue")
+        .field("addr", &(self as *const Queue))
         .field("desc", &format_args!("{:?}", self.desc.iter().filter(|x| x.addr != 0).collect::<Vec<&Descriptor>>()))
         .field("avail", &self.avail)
         // .field("padding0", &self.padding0)
@@ -172,28 +177,19 @@ impl core::fmt::Debug for Queue {
 
 
 /// TODO Return result
-fn init_device(dev: &mut StandardVirtIO, supported_features: u32) -> Option<()> {
+fn init_device(dev: &mut StandardVirtIO, supported_drv_features: u32) -> Option<()> {
     unsafe {
-        let mut status_bits = 0;
-        dev.write(MmioOffset::Status, status_bits); // Reset device
-        status_bits |= StatusField::Acknowledge;
-        dev.write(MmioOffset::Status, status_bits);
-        status_bits |= StatusField::DriverOk;
-        dev.write(MmioOffset::Status, status_bits);
-        // Read device feature bits, write subset of feature
-        // we support and device support.
-        let host_features = dev.read(MmioOffset::HostFeatures);
-        let guest_features = host_features & supported_features;
-        let ro = host_features & (1 << block::VIRTIO_BLK_F_RO) != 0;
-        dev.write(MmioOffset::GuestFeatures, guest_features);
-        status_bits |= StatusField::FeaturesOk;
-        dev.write(MmioOffset::Status, status_bits);
+        dev.write(MmioOffset::Status, 0); // Reset device
+        dev.set_driver_status_bit(StatusField::Acknowledge);
+        dev.set_driver_status_bit(StatusField::DriverOk);
+        dev.set_features(supported_drv_features);
+        // let ro = host_features & (1 << block::VIRTIO_BLK_F_RO) != 0;
         
         // Re-read status to ensure FEATURES_OK is still set.
         // Otherwise, it doesn't support our features.
         if dev.read(MmioOffset::Status) & (StatusField::FeaturesOk as u32) == 0 {
             log::warn!("Device {} doesn't support our features :c ", dev.idx);
-            dev.write(MmioOffset::Status, StatusField::Failed as _);
+            dev.set_driver_status_bit(StatusField::Failed as _);
             return None;
         }
         Some(())
@@ -204,10 +200,24 @@ impl StandardVirtIO {
         VIRTIO_START+self.idx*VIRTIO_STRIDE
     }
     unsafe fn write(&mut self, reg: MmioOffset, value: u32) {
-        unsafe{*(reg.ptr()).byte_add(self.base()) = value}
+        unsafe{(reg.ptr()).byte_add(self.base()).write_volatile(value)}
     }
     fn read(&self, reg: MmioOffset) -> u32 {
-        unsafe{*(reg.ptr()).byte_add(self.base())}
+        unsafe{(reg.ptr()).byte_add(self.base()).read_volatile()}
+    }
+    /// The driver MUST NOT clear a device status bit. If the driver sets the FAILED bit, the driver MUST later reset the device before attempting to re-initialize
+    pub fn set_driver_status_bit(&mut self, field: StatusField) {
+        unsafe{self.write(MmioOffset::Status, self.read(MmioOffset::Status) | field as u32)}
+    }
+    /// Sets subset of the features supported by device and driver. 
+    /// returns the intersection of both.
+    /// **You must check the FeaturesOk to see if it is still set, if no the features are not supported**
+    pub fn set_features(&mut self, supported_drv_features: u32) -> u32 {
+        let dev_features = self.read(MmioOffset::DeviceFeatures);
+        let drv_features = dev_features & supported_drv_features;
+        unsafe { self.write(MmioOffset::DriverFeatures, drv_features) };
+        self.set_driver_status_bit(StatusField::FeaturesOk);
+        drv_features
     }
 }
 
@@ -215,25 +225,63 @@ pub trait VirtIODevice {
     fn handle_int(&mut self);
 }
 
+/// Guest is Driver and Host is device
 pub enum MmioOffset {
+    /// Read-only
     MagicValue = 0x000,
+    /// 0x2. Note: Legacy devices (see 4.2.4 Legacy interface) used 0x1.
+    /// Read-only
     Version = 0x004,
+    /// Read-only
     DeviceId = 0x008,
+    /// Read-only
     VendorId = 0x00c,
-    HostFeatures = 0x010,
-    HostFeaturesSel = 0x014,
-    GuestFeatures = 0x020,
-    GuestFeaturesSel = 0x024,
-    GuestPageSize = 0x028,
+    /// Reading from this register returns 32 consecutive flag bits, the least significant bit depending on the last value written to DeviceFeaturesSel. 
+    /// Access to this register returns bits DeviceFeaturesSel ∗ 32 to (DeviceFeaturesSel ∗ 32) + 31, eg. feature bits 0 to 31 if DeviceFeaturesSel is 
+    /// set to 0 and features bits 32 to 63 if DeviceFeaturesSel is set to 1. Also see 2.2 Feature Bits.
+    /// Read-only
+    DeviceFeatures = 0x010,
+    /// Writing to this register selects a set of 32 device feature bits accessible by reading from DeviceFeatures.
+    /// Write-only
+    DeviceFeaturesSel = 0x014,
+    /// Writing to this register sets 32 consecutive flag bits, the least significant bit depending on the last value written to DriverFeaturesSel. 
+    /// Access to this register sets bits DriverFeaturesSel ∗ 32 to (DriverFeaturesSel ∗ 32) + 31, eg. feature bits 0 to 31 if DriverFeaturesSel is *
+    /// set to 0 and features bits 32 to 63 if DriverFeaturesSel is set to 1. Also see 2.2 Feature Bits.
+    /// Write-only
+    DriverFeatures = 0x020,
+    /// Writing to this register selects a set of 32 activated feature bits accessible by writing to DriverFeatures.
+    /// Write-only
+    DriverFeaturesSel = 0x024,
+    DriverPageSize = 0x028,
+    /// Writing to this register selects the virtual queue that the following operations on 
+    /// QueueNumMax, QueueNum, QueueReady, QueueDescLow, QueueDescHigh, QueueAvailLow, QueueAvailHigh, QueueUsedLow and QueueUsedHigh apply to. 
+    /// The index number of the first queue is zero (0x0).
+    /// Write-only
     QueueSel = 0x030,
+    /// Reading from the register returns the maximum size (number of elements) of the queue the device is ready to process or zero (0x0) if the queue is not available. 
+    /// This applies to the queue selected by writing to QueueSel.
+    /// Read-only
     QueueNumMax = 0x034,
     QueueNum = 0x038,
     QueueAlign = 0x03c,
     QueuePfn = 0x040,
     QueueNotify = 0x050,
+    /// Reading from this register returns a bit mask of events that caused the device interrupt to be asserted. The following events are possible:
+    /// Used Buffer Notification
+    /// - bit 0 - the interrupt was asserted because the device has used a buffer in at least one of the active virtual queues.
+    /// Configuration Change Notification
+    /// - bit 1 - the interrupt was asserted because the configuration of the device has changed
+    /// Read-only
     InterruptStatus = 0x060,
+    /// Writing a value with bits set as defined in InterruptStatus to this register notifies the device that events causing the interrupt have been handled
+    /// Write-only
     InterruptAck = 0x064,
+    /// Reading from this register returns the current device status flags. Writing non-zero values to this register sets the status flags, indicating the driver progress. 
+    /// Writing zero (0x0) to this register triggers a device reset. See also p. 4.2.3.1 Device Initialization.
+    /// Read-Write
     Status = 0x070,
+    /// Device-specific configuration space starts at the offset 0x100 and is accessed with byte alignment. 
+    /// Its meaning and size depend on the device and the driver.
     Config = 0x100,
 }
 impl MmioOffset {
@@ -292,11 +340,17 @@ impl VirtIODevicePtr {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum StatusField {
+    /// Indicates that the guest OS has found the device and recognized it as a valid virtio device.
     Acknowledge      = 1<<0,
+    /// Indicates that the guest OS knows how to drive the device. Note: There could be a significant (or infinite) delay before setting this bit. For example, under Linux, drivers can be loadable modules
     Driver           = 1<<1,
+    /// Indicates that the driver is set up and ready to drive the device
     DriverOk         = 1<<2,
+    /// Indicates that the driver has acknowledged all the features it understands, and feature negotiation is complete
     FeaturesOk       = 1<<3,
+    /// Indicates that the device has experienced an error from which it can’t recover
     DeviceNeedsReset = 1<<6,
+    /// Indicates that something went wrong in the guest, and it has given up on the device. This could be an internal error, or the driver didn’t like the device for some reason, or even a fatal error during device operation
     Failed           = 1<<7,
 }
 impl core::ops::BitOr<Self> for StatusField {

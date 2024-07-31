@@ -29,8 +29,9 @@ pub fn log_err() {
         }
     }
     println!("");
-    
-    dbg!(unsafe { MAIN_HEAP_ALLOCATOR.idx() });
+    if unsafe { MAIN_HEAP_ALLOCATOR.idx() } > 10000 {
+        dbg!(unsafe { MAIN_HEAP_ALLOCATOR.idx() });
+    }
 }
 
 

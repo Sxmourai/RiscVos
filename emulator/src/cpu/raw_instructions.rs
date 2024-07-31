@@ -242,7 +242,7 @@ pub const INSTRUCTIONS32: [InstructionDescription32; 60] = [
 pub enum InstructionDescription {
     Base(InstructionDescription32),
     Compressed(InstructionDescription16),
-}
+}       
 
 pub fn get_from_opcode(opcode:u8) -> Option<&'static Vec<InstructionDescription>> {
     unsafe{REVERSE_INSTRUCTIONS_MASKS.get()?.get(opcode as usize)}

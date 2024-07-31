@@ -107,7 +107,7 @@ def handle_qemu_output(qemu: subprocess.Popen):
                 for addr in addrs:
                     try:
                         fname,path = subprocess.check_output(f"riscv64-unknown-elf-addr2line -e {config().kernel_file()} -f 0x{int(addr):x}".split(" ")).decode(errors='ignore').splitlines()
-                    except PermissionError:print("You might not have binutils-riscv64-unknown-elf, we can't give backtrace info");exit(1)
+                    except PermissionError:print("You might not have binutils-riscv64-unknown-elf and rustfilt, we can't give backtrace info");exit(1)
                     fnames.append(fname)
                     paths.append(path)
                 with open("target/mangled.txt", "w") as f:

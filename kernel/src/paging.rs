@@ -293,6 +293,14 @@ impl PageTable {
         *leaf_pte = PageTableEntry::with_phys_pn(paddr).apply_flags(flags);
         Ok(leaf_pte)
     }
+    pub unsafe fn map_range(&mut self, start: Sv39VirtualAddress, page_count: u64, flags: PageTableEntryFlags) -> Result<(), PagingError> {
+        for i in 0..page_count {
+            let page_idx = i*PAGE_SIZE64;
+            let page_addr = start.0+page_idx;
+            unsafe{self.map(Sv39VirtualAddress(page_addr), Sv39PhysicalAddress(page_addr), flags)?};
+        }
+        Ok(())
+    }
 }
 impl core::ops::Index<usize> for PageTable {
     type Output = PageTableEntry;
@@ -358,6 +366,9 @@ pub fn get_page(vaddr: Sv39VirtualAddress) -> Result<&'static PageTableEntry, Pa
 macro_rules! map {
     ($vaddr: expr) => {
         $crate::map!($vaddr, $vaddr, flags=$crate::paging::PageTableEntryFlags::rwx())
+    };
+    ($vaddr: expr, count=$count: expr) => {
+        unsafe{$crate::paging::get_root_pt()?.map_range($crate::paging::Sv39VirtualAddress($vaddr as _), $count, $crate::paging::PageTableEntryFlags::rwx())?}
     };
     ($vaddr: expr, $paddr: expr) => {
         $crate::map!($vaddr, $paddr, flags=$crate::paging::PageTableEntryFlags::rwx())
