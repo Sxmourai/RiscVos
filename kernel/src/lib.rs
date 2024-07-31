@@ -34,6 +34,8 @@ pub mod virtio;
 pub mod thread;
 
 pub fn main_loop() {
+    log::info!("Allocated {} pages", unsafe{heap::MAIN_HEAP_ALLOCATOR.idx()});
+    // poweroff();
 	loop {
         riscv::wfi()
     }

@@ -18,6 +18,7 @@ pub fn test_all() {
 
 pub fn close_qemu() -> ! {
     crate::print!("FLAG_EO_TESTS"); // Interpreted in run.py and test.py to close qemu
+    poweroff();
     unreachable!()
 }
 

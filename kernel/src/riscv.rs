@@ -194,8 +194,10 @@ pub fn read_sp() -> u64 {
 
 // Thx to https://unix.stackexchange.com/questions/645618/writing-an-os-shutdown-process-for-qemu-xv6
 pub fn poweroff() {
+    crate::map!(0x100000);
     unsafe {core::ptr::write_volatile(0x100000 as *mut _, 0x5555u16)}
 }
 pub fn reboot() {
+    crate::map!(0x100000);
     unsafe {core::ptr::write_volatile(0x100000 as *mut _, 0x7777u16)}
 }

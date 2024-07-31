@@ -20,9 +20,14 @@ class Config(NamedTuple):
     
     def from_args(args: argparse.Namespace):
         return Config(args)
-_config = [None, ]
-def config() -> Config:return _config[0]
-def _strip_empty_cmd(cmd):return filter(lambda w: w != "", map(lambda x: x.strip(),cmd.split(" ")))
+
+def run(args=None):
+    if args==None:
+        args = parse_args()
+    build_kernel(args)
+    qemu = qemu_cmd(args)
+    handle_qemu_output(qemu)
+
 
 def create_parser(name="Kernel script", args: List[Tuple[list, dict]]=[]):
     parser = argparse.ArgumentParser(name)
@@ -32,6 +37,7 @@ def create_parser(name="Kernel script", args: List[Tuple[list, dict]]=[]):
     parser.add_argument("--log-level", default="debug")
     parser.add_argument("--build-args", default="")
     parser.add_argument("--qemu-args", default="")
+    parser.add_argument("--machine", default="virt")
     parser.add_argument("-q", "--quiet", action=argparse.BooleanOptionalAction)
     for _args, _kwargs in args:
         parser.add_argument(*_args, **_kwargs)
@@ -42,6 +48,15 @@ def parse_args(*args, **kwargs):
     _config[0] = Config.from_args(args)
     return args
 
+
+def fake_args(args: str) -> argparse.Namespace:
+    args = create_parser().parse_args(args)
+    _config[0] = Config.from_args(args)
+    return args
+
+_config = [Config(create_parser().parse_args([])), ]
+def config() -> Config:return _config[0]
+def _strip_empty_cmd(cmd):return filter(lambda w: w != "", map(lambda x: x.strip(),cmd.split(" ")))
 
 import subprocess
 def build_kernel(args: argparse.ArgumentParser):
@@ -56,17 +71,42 @@ def build_kernel(args: argparse.ArgumentParser):
     return output
 
 def qemu_cmd(args: argparse.ArgumentParser):
+    disk = f"-drive if=none,format=raw,file=disk.hdd,id=fat_disk -device virtio-blk-device,scsi=off,drive=fat_disk"
+    gpu = f"-device virtio-gpu-device"
+    net = f"-device virtio-net-device"
+    virtio = f"{disk} {gpu} {net}"
+    machine = f"-machine {args.machine} "
+    match args.machine:
+        case "virt":machine += f"-smp {args.cpu_count} -m {args.mem_size} "
+        case "sifive_e":virtio=""
+        case "sifive_u":virtio=""
+        case "spike":virtio=""
+        case "shakti_c":virtio=""
+        case "microchip-icicle-kit":virtio=""
+        case "help":print_machines_help();exit(1)
+        case unsupported_machine:print(f"Unsupported machine: {unsupported_machine}");exit(1)
+    if args.machine != "virt":
+        print("Those machines are not greatly supported, beware !")
+    cmd = f"""qemu-system-riscv64 
+                        -kernel {config().kernel_file()}
+                        -nographic -serial mon:stdio -bios none 
+                        {virtio}
+                        -d guest_errors,unimp
+                        {machine}
+                        {args.qemu_args}"""
     # gpu: rutabaga: ,gfxstream-vulkan=on,hostmem=2G
-    return subprocess.Popen(_strip_empty_cmd(f"""qemu-system-riscv64 
-                        -machine virt -smp {args.cpu_count} -m {args.mem_size} 
+    return subprocess.Popen(_strip_empty_cmd(cmd), stdout=subprocess.PIPE)
+
+def print_qemu_cmd():
+    print(" ".join(_strip_empty_cmd("""qemu-system-riscv64 
+                        -machine virt -smp 4 -m 128M 
                         -nographic -serial mon:stdio -bios none 
                         -drive if=none,format=raw,file=disk.hdd,id=fat_disk -device virtio-blk-device,scsi=off,drive=fat_disk
                         -device virtio-gpu-device
                         -device virtio-net-device
                         -d guest_errors,unimp
-                        -kernel {config().kernel_file()}
-                        {args.qemu_args}"""), stdout=subprocess.PIPE)
-
+                        -kernel target/riscv64gc-unknown-none-elf/debug/kernel""")))
+if __name__ == "__main__":print_qemu_cmd()
 
 
 def handle_qemu_output(qemu: subprocess.Popen):
@@ -135,3 +175,6 @@ def handle_qemu_output(qemu: subprocess.Popen):
     # Erase last FLAG_EO_TESTS print and other qemu stuff
     sys.stdout.flush()
 
+
+def print_machines_help():
+    print(subprocess.check_output("qemu-system-riscv64 -machine help".split(" ")).decode())

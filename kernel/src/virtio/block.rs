@@ -66,6 +66,8 @@ pub struct BlockDevice {
     pub config: &'static mut Config,
     queue: Option<&'static mut Queue>,
     queue_idx: usize,
+    /// Cache the request field, we will overwrite it on every command
+    request: &'static mut Request,
     // pendings: Vec<&'static [u8]>, // Not static, but gonna change it, but lifetime is not the right move for now
 }
 impl BlockDevice {
@@ -76,6 +78,7 @@ impl BlockDevice {
             queue: None,
             queue_idx: 0,
             config,
+            request: unsafe{&mut *(kmalloc(core::mem::size_of::<Request>()).ok()? as *mut Request)},
             // pendings: Vec::new(),
         };
         _s.specific_init()?;
@@ -118,48 +121,35 @@ impl BlockDevice {
     fn op(&mut self, sector_offset: u64, buffer: &[u8], writing: bool) -> Option<()> {
         assert_eq!(buffer.len()%512, 0);
         if self.mmio.read_only && writing {return None;}
-        let request = unsafe{&mut *(kmalloc(core::mem::size_of::<Request>()).ok()? as *mut Request)};
-        request.header.sector = sector_offset;
-        request.header.blktype = if writing {VIRTIO_BLK_T_OUT} else {VIRTIO_BLK_T_IN};
-        request.header.reserved = 0;
+        self.request.header.sector = sector_offset;
+        self.request.header.blktype = if writing {VIRTIO_BLK_T_OUT} else {VIRTIO_BLK_T_IN};
         
-        request.data = core::ptr::addr_of!(buffer[0]) as _;
+        self.request.data = core::ptr::addr_of!(buffer[0]) as _;
         // We put 111 in the status. Whenever the device finishes, it will write into
         // status. If we read status and it is 111, we know that it wasn't written to by
         // the device.
-        request.status = 111;
-        let desc = Descriptor {
-            addr: core::ptr::addr_of!(request.header) as u64,
-            len:  core::mem::size_of::<Header>() as _,
-            flags:VIRTIO_DESC_F_NEXT,
-            next: 0,
-        };
-        unsafe {
-            self.fill_next_descriptor(desc)?;
-        }
-
-        let head_idx = self.queue_idx.clone();
+        self.request.status = 111;
+        // Block request header
+        let head_idx = self.create_next_descriptor(
+            core::ptr::addr_of!(self.request.header) as u64, 
+        core::mem::size_of::<Header>() as _, 
+            VIRTIO_DESC_F_NEXT
+        )?;
 
         let mut flags = VIRTIO_DESC_F_NEXT;
         if !writing {
             flags |= VIRTIO_DESC_F_WRITE
         }
-        let data_desc = Descriptor { 
-            addr: core::ptr::addr_of!(buffer[0]) as u64,
-            len: buffer.len() as u32,
-            flags,
-            next: 0,
-        };
-        unsafe {self.fill_next_descriptor(data_desc)}?;
-        let data_idx = self.queue_idx;
-        let status_desc = Descriptor {
-            addr:  core::ptr::addr_of!(request.status) as u64,
-            len:   1,
-            flags: VIRTIO_DESC_F_WRITE,
-            next:  0, 
-        };
-        unsafe {self.fill_next_descriptor(status_desc)}?;
-        let status_idx = self.queue_idx;
+        // Block request buffer
+        self.create_next_descriptor(
+            core::ptr::addr_of!(buffer[0]) as u64, 
+            buffer.len() as u32, flags)?;
+
+        // Block request status
+        self.create_next_descriptor(
+            core::ptr::addr_of!(self.request.status) as u64, 
+            1, VIRTIO_DESC_F_WRITE)?;
+    
         let mut queue = self.queue.as_mut()?;
         queue.avail.ring[queue.avail.idx as usize] = head_idx as u16;
         queue.avail.idx = (((queue.avail.idx as usize) + 1) % VIRTIO_RING_SIZE) as _;
@@ -168,7 +158,9 @@ impl BlockDevice {
         unsafe {self.mmio.write(MmioOffset::QueueNotify, 0);}
         Some(())
     }
-    unsafe fn fill_next_descriptor(&mut self, desc: Descriptor) -> Option<()> {
+    /// Returns the index of the descriptor in the queue
+    fn create_next_descriptor(&mut self, addr: u64, len: u32, flags: u16) -> Option<usize> {
+        let desc = Descriptor { addr, len, flags, next: 0 };
 		// The ring structure increments here first. This allows us to skip
 		// index 0, which then in the used ring will show that .id > 0. This
 		// is one way to error check. We will eventually get back to 0 as
@@ -181,7 +173,7 @@ impl BlockDevice {
             // If the next flag is set, we need another descriptor.
             queue.desc[self.queue_idx].next = ((self.queue_idx + 1) % VIRTIO_RING_SIZE) as _;
         }
-        Some(())
+        Some(self.queue_idx)
     }
     /// Reads size in bytes and returns a vector of the values as T
     pub fn read(&mut self, sector_offset: u64, buffer: &mut [u8]) -> Option<()> {
@@ -200,11 +192,12 @@ impl VirtIODevice for BlockDevice {
         let head_idx = queue.avail.ring[queue.avail.idx as usize-1];
         let rq_addr = queue.desc[head_idx as usize].addr;
         let rq = unsafe {&mut *(rq_addr as *mut Request)};
+        dbg!(queue.avail, queue.used);
         match rq.status {
             0 => {}, // Success
             1 => {todo!()}, // IO Error
             2 => {todo!()}, // Unsupported op
-            111 => {log::warn!("Not ");}
+            111 => {log::warn!("Maybe issued two commands to fast, we will have to check that !");}
             status => todo!("Invalid status: {}", status)
         };
         // todo!()

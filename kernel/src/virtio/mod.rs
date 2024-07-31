@@ -6,7 +6,7 @@ pub mod gpu;
 pub mod input;
 pub mod memory;
 
-use alloc::{boxed::Box, string::ToString, vec::{self, Vec}};
+use alloc::{boxed::Box, format, string::ToString, vec::{self, Vec}};
 use log::{info, warn};
 
 use crate::{*, paging::{PAGE_SIZE, PAGE_SIZE64}};
@@ -132,7 +132,7 @@ impl core::fmt::Debug for Available {
         f.debug_struct("Available")
         .field("flags", &self.flags)
         .field("idx", &self.idx)
-        .field("ring", &self.ring.iter().map(|x| x.to_string()).collect::<alloc::string::String>())
+        .field("ring", &self.ring.iter().map(|x| format!("{x} ")).collect::<alloc::string::String>())
         .field("event", &self.event).finish()
     }
 }
