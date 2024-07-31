@@ -63,7 +63,7 @@ pub fn init_device(mmio: StandardVirtIO) -> Option<VirtIODevicePtr> {
 #[derive(Debug)]
 pub struct BlockDevice {
     mmio: StandardVirtIO,
-    config: &'static mut Config,
+    pub config: &'static mut Config,
     queue: Option<&'static mut Queue>,
     queue_idx: usize,
     // pendings: Vec<&'static [u8]>, // Not static, but gonna change it, but lifetime is not the right move for now
@@ -204,7 +204,8 @@ impl VirtIODevice for BlockDevice {
             0 => {}, // Success
             1 => {todo!()}, // IO Error
             2 => {todo!()}, // Unsupported op
-            _ => todo!()
+            111 => {log::warn!("Not ");}
+            status => todo!("Invalid status: {}", status)
         };
         // todo!()
     }
@@ -235,20 +236,20 @@ pub struct Topology {
 #[repr(C)]
 #[derive(Debug)]
 pub struct Config {
-	capacity:                 u64,
-	size_max:                 u32,
-	seg_max:                  u32,
-	geometry:                 Geometry,
-	blk_size:                 u32,
-	topology:                 Topology,
-	writeback:                u8,
+	pub capacity:                 u64,
+	pub size_max:                 u32,
+	pub seg_max:                  u32,
+	pub geometry:                 Geometry,
+	pub blk_size:                 u32,
+	pub topology:                 Topology,
+	pub writeback:                u8,
 	unused0:                  [u8; 3],
-	max_discard_sector:       u32,
-	max_discard_seg:          u32,
-	discard_sector_alignment: u32,
-	max_write_zeroes_sectors: u32,
-	max_write_zeroes_seg:     u32,
-	write_zeroes_may_unmap:   u8,
+	pub max_discard_sector:       u32,
+	pub max_discard_seg:          u32,
+	pub discard_sector_alignment: u32,
+	pub max_write_zeroes_sectors: u32,
+	pub max_write_zeroes_seg:     u32,
+	pub write_zeroes_may_unmap:   u8,
 	unused1:                  [u8; 3],
 }
 

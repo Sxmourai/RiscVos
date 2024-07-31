@@ -11,6 +11,7 @@ for test in os.listdir(script_lib.TEST_DIR):
         lines = ""
         for line in raw_content.splitlines(keepends=True):
             if line.startswith("#!"):continue
+            if line.startswith("//"):continue
             if "fn" in line:
                 fname = line.strip().lstrip("pub ").lstrip("const ").lstrip("fn ")
                 fname = fname[:fname.index("(")].strip()

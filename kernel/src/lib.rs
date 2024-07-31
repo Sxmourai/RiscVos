@@ -34,14 +34,6 @@ pub mod virtio;
 pub mod thread;
 
 pub fn main_loop() {
-    let mut blk = match unsafe { crate::virtio::VIRTIO_DEVICES[7].as_mut().unwrap() } {
-        virtio::VirtIODevicePtr::Block(blk) => blk,
-        _ => todo!(),
-    };
-    let mut buffer = alloc::vec![0u8; 1024];
-    blk.read(0, &mut buffer);
-    let read = alloc::string::String::from_utf8(buffer).unwrap();
-    print!("{}", read);
 	loop {
         riscv::wfi()
     }

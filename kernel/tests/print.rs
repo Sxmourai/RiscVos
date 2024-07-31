@@ -8,5 +8,4 @@ fn print_simple() {
 }
 fn print_2() {
     kernel::println!("Hello world ! 🥰");
-    panic!("Sad");
 }

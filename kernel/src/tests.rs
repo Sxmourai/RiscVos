@@ -1,3 +1,4 @@
+
 use heap::MAIN_HEAP_ALLOCATOR;
 
 use crate::*;
@@ -11,11 +12,13 @@ pub fn test_all() {
         (test)();
         crate::println!("\t   Success !");
     }
+    close_qemu()
 }
 
 
-pub fn close_qemu() {
+pub fn close_qemu() -> ! {
     crate::print!("FLAG_EO_TESTS"); // Interpreted in run.py and test.py to close qemu
+    unreachable!()
 }
 
 pub fn log_err() {
@@ -56,5 +59,5 @@ fn panic(info: &core::panic::PanicInfo<'_>) -> ! {
             log::warn!("Panic callback returned !");
         }
     }
-    loop {riscv::wfi()}
+    close_qemu()
 }

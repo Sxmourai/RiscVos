@@ -56,10 +56,14 @@ def build_kernel(args: argparse.ArgumentParser):
     return output
 
 def qemu_cmd(args: argparse.ArgumentParser):
+    # gpu: rutabaga: ,gfxstream-vulkan=on,hostmem=2G
     return subprocess.Popen(_strip_empty_cmd(f"""qemu-system-riscv64 
                         -machine virt -smp {args.cpu_count} -m {args.mem_size} 
                         -nographic -serial mon:stdio -bios none 
                         -drive if=none,format=raw,file=disk.hdd,id=fat_disk -device virtio-blk-device,scsi=off,drive=fat_disk
+                        -device virtio-gpu-device
+                        -device virtio-net-device
+                        -d guest_errors,unimp
                         -kernel {config().kernel_file()}
                         {args.qemu_args}"""), stdout=subprocess.PIPE)
 
