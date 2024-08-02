@@ -113,6 +113,7 @@ pub type InstructionDescription32 = (&'static str, Instruction32Format, Instruct
 pub type InstructionFunction16 = fn(&mut crate::vm::VM, super::instructions::Instruction16);
 pub type InstructionDescription16 = (&'static str, Instruction16Format, Instruction16Mask, InstructionFunction16);
 
+
 /// Based on
 /// Chapter 34. RV32/64G Instruction Set Listings
 /// And https://www.eg.bucknell.edu/~csci206/riscv-converter/Annotated_RISCV_Card.pdf at beginning
@@ -201,7 +202,6 @@ pub const INSTRUCTIONS32: [InstructionDescription32; 60] = [
     }),   _mask(0b1101111, 0b0, 0b0)),
     
     desc(i!(ecall,  {
-        dbg!(imm, rs1, rd);
         match imm {
             0 => {
                 todo!("ECALL")

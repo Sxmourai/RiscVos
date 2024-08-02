@@ -55,7 +55,7 @@ impl VM {
                 println!(" - {}", instruction);
                 let (_name, _fmt, _mask, fun) = crate::cpu::raw_instructions::find_instruction32_desc(instruction);
                 fun(self, instruction);
-                self.cpu.pc += core::mem::size_of::<Instruction>() as uguest;
+                self.cpu.pc += core::mem::size_of::<u32>() as uguest;
             }
             *self.cpu.reg(Reg::zero) = 0; // Currently we need to set it manually
             #[cfg(debug_assertions)]
