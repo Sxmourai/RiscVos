@@ -1,7 +1,8 @@
 // We can now access cpu registers using zero, s0, a0 etc... See cpu/reg.rs 
 use crate::cpu::reg::Reg;
 use color_eyre::eyre::{Context, ContextCompat};
-use cpu::instructions::{get_from_opcode, Instruction16};
+use color_eyre::Result;
+use cpu::instructions::Instruction16;
 
 use crate::*;
 use crate::cpu::instructions::Instruction;
@@ -12,7 +13,7 @@ pub struct VM {
 }
 impl VM {
     pub fn new(program: Vec<u8>) -> Self {
-        crate::cpu::instructions::set_instructions_funcs();
+        crate::cpu::raw_instructions::set_instructions_funcs();
         Self {
             mem: mem::Memory::with_program(program),
             cpu: crate::cpu::CPU::default(),
@@ -34,16 +35,16 @@ impl VM {
                     Instruction::Base(_) => unreachable!(),
                     Instruction::Compressed(c) => c,
                 };
-
+                todo!();
                 // Execute
-                println!(" - {}", fst);
-                let (_name, _fmt, _mask, fun) = crate::cpu::instructions::find_instruction16_desc(fst);
-                fun(self, fst);
-                self.cpu.pc += core::mem::size_of::<Instruction16>() as uguest;
-                *self.cpu.reg(Reg::zero) = 0; // Currently we need to set it manually
-                println!(" - {}", snd);
-                let (_name, _fmt, _mask, fun) = crate::cpu::instructions::find_instruction16_desc(snd);
-                fun(self, snd);
+                // println!(" - {}", fst);
+                // let (_name, _fmt, _mask, fun) = crate::cpu::instructions::find_instruction16_desc(fst);
+                // fun(self, fst);
+                // self.cpu.pc += core::mem::size_of::<Instruction16>() as uguest;
+                // *self.cpu.reg(Reg::zero) = 0; // Currently we need to set it manually
+                // println!(" - {}", snd);
+                // let (_name, _fmt, _mask, fun) = crate::cpu::instructions::find_instruction16_desc(snd);
+                // fun(self, snd);
                 self.cpu.pc += core::mem::size_of::<Instruction16>() as uguest;
             } else {
                 let instruction = match instructions.0 {
@@ -52,7 +53,7 @@ impl VM {
                 };
                 // Execute
                 println!(" - {}", instruction);
-                let (_name, _fmt, _mask, fun) = crate::cpu::instructions::find_instruction32_desc(instruction);
+                let (_name, _fmt, _mask, fun) = crate::cpu::raw_instructions::find_instruction32_desc(instruction);
                 fun(self, instruction);
                 self.cpu.pc += core::mem::size_of::<Instruction>() as uguest;
             }
@@ -73,9 +74,58 @@ impl VM {
     //     Ok(())
     // }
 }
+impl std::fmt::Debug for VM {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("VM").field("cpu", &self.cpu).finish()
+    }
+}
+impl std::fmt::Display for VM {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use std::fmt::Write;
+        let mut regs = String::new();
+        for (i,reg_value) in self.cpu.regs.iter().enumerate() {
+            let reg_name = cpu::reg::REGS[i];
+            write!(regs, "{}: {}\t\t", reg_name, reg_value)?;
+            if (i+1)%4 == 0 {
+                writeln!(regs);
+            }
+        }
+        let csrs = format_args!("todo");
+        f.write_fmt(format_args!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ REGISTERS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ CSRs ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{}
+        ", regs, csrs))
+    }
+}
 
-pub fn run(program: Vec<u8>) {
-    VM::new(program).run().unwrap();
+#[cfg(debug_assertions)]
+pub static mut MAIN_VM: Option<VM> = None;
+
+#[cfg(debug_assertions)]
+/// Sets up a pretty print of the vm state when panicking
+fn setup_dbg_vm(vm: VM) -> &'static mut VM {
+    unsafe {
+        let _ = MAIN_VM.replace(vm);
+        let color_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            println!("VM: {}", MAIN_VM.as_mut().unwrap());
+            color_hook(info)
+        }));
+        MAIN_VM.as_mut().unwrap()
+    }
+}
+
+pub fn run(program: Vec<u8>) -> Result<()> {
+    let mut vm = VM::new(program);
+    let vm = setup_dbg_vm(vm);
+    match vm.run() {
+        Ok(_) => Ok(()),
+        Err(err) => {
+            dbg!(vm);
+            Err(err)
+        },
+    }
 }
 
 // let (s1, has_s2) = match instruction.s1() {

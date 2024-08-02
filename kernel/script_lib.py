@@ -115,6 +115,7 @@ def handle_qemu_output(qemu: subprocess.Popen):
     try:
         while True:
             read += qemu.stdout.read(1).decode(errors="ignore")
+            if qemu.returncode != None:break
             if len(read)==0:break
             print(read[-1], end="")
             sys.stdout.flush()

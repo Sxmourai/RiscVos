@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 
 use color_eyre::eyre::{ContextCompat, Error, Result};
-
+use color_eyre::Report;
 use crate::{iguest, uguest};
 
 // Inspired by QEMU
@@ -176,37 +176,38 @@ impl Memory {
             uart: UART::default(),
         }
     }
-    pub fn get_region(&mut self, offset: uguest, len:uguest) -> Option<&mut dyn MemoryRegion> {
-        Some(
+    pub fn get_region(&mut self, offset: uguest, len:uguest) -> Result<&mut dyn MemoryRegion> {
+        Ok(
         if offset>=MemMap::DRAM.base() {
             &mut self.dram
         } 
         else if MemMap::UART0.in_bounds(offset, len) {
             &mut self.uart
         }
-        else {todo!("{}",offset)}
-        )
+        else {
+            return Err(Report::msg(format!("Can't find region: {}-{}",offset, offset+len)))
+        })
     }
     pub fn get<T: Copy>(&mut self, offset: uguest) -> Result<T> {
-        let region = self.get_region(offset, core::mem::size_of::<T>() as _).context("Can't find region")?;
+        let region = self.get_region(offset, core::mem::size_of::<T>() as _)?;
         let bytes = unsafe { region.read_bytes(offset-region.base(), core::mem::size_of::<T>() as _) };
         Ok(unsafe { *(bytes.as_ptr() as *const T) })
     }
     pub fn set<T>(&mut self, offset: uguest, mut val: T) -> Result<()> {
         let mut vec_val = unsafe { core::slice::from_raw_parts_mut(&mut val as *mut T as *mut u8, core::mem::size_of::<T>()) };
-        let region = self.get_region(offset, core::mem::size_of::<T>() as _).context("Can't find region")?;
+        let region = self.get_region(offset, core::mem::size_of::<T>() as _)?;
         unsafe { region.write_bytes(offset-region.base(), &mut vec_val) }
         Ok(())
     }
 
     // For u16, more efficient than `(program[5] as u16) << 8|program[4] as u16` ?
-    pub fn read(&mut self, offset: uguest, len: uguest) -> Option<Vec<u8>> {
+    pub fn read(&mut self, offset: uguest, len: uguest) -> Result<Vec<u8>> {
         // Getting mut self because It's a pain
         let region = self.get_region(offset, len)?;
-        Some(unsafe { region.read_bytes(offset-region.base(), len) })
+        Ok(unsafe { region.read_bytes(offset-region.base(), len) })
     }
     pub fn write(&mut self, offset: uguest, buffer: &mut [u8]) -> Result<()> {
-        let region = self.get_region(offset, buffer.len() as _).context("Can't find region")?;
+        let region = self.get_region(offset, buffer.len() as _)?;
         unsafe { region.write_bytes(offset-region.base(), buffer) }
         Ok(())
     }

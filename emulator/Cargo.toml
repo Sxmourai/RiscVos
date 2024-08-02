@@ -3,6 +3,8 @@ name = "emulator"
 version = "0.1.0"
 edition = "2021"
 
+[profile.dev.package.backtrace]
+opt-level = 3
 
 [dependencies]
 bit_field = "0.10.2"

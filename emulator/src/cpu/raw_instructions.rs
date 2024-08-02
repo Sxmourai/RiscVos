@@ -3,6 +3,7 @@
 
 use std::cell::OnceCell;
 
+use color_eyre::eyre::ContextCompat;
 use color_eyre::Report;
 use instruction_proc::instruction_r as r;
 use instruction_proc::instruction_i as i;
@@ -27,10 +28,10 @@ use super::instructions::Instruction32;
 
 use color_eyre::Result;
 
-const fn _mask(opcode: u32, fun3: u32, fun7: u32) -> InstructionMask {
-    InstructionMask(opcode | fun3 << 12 | fun7 << 25)
+const fn _mask(opcode: u32, fun3: u32, fun7: u32) -> Instruction32Mask {
+    Instruction32Mask(opcode | fun3 << 12 | fun7 << 25)
 }
-const fn desc(macro_out: (&'static str, Instruction32Format, InstructionFunction32), mask: InstructionMask) -> InstructionDescription32 {
+const fn desc(macro_out: (&'static str, Instruction32Format, InstructionFunction32), mask: Instruction32Mask) -> InstructionDescription32 {
     (macro_out.0, macro_out.1, mask, macro_out.2)
 }
 
@@ -242,12 +243,12 @@ pub const INSTRUCTIONS32: [InstructionDescription32; 60] = [
 pub enum InstructionDescription {
     Base(InstructionDescription32),
     Compressed(InstructionDescription16),
-}       
+}
 
-pub fn get_from_opcode(opcode:u8) -> Option<&'static Vec<InstructionDescription>> {
+pub fn get_from_opcode(opcode:u8) -> Option<&'static Vec<InstructionDescription32>> {
     unsafe{REVERSE_INSTRUCTIONS_MASKS.get()?.get(opcode as usize)}
 }
-pub fn try_find_instruction32_desc(inst: Instruction32) -> Result<InstructionDescription> {
+pub fn try_find_instruction32_desc(inst: Instruction32) -> Result<InstructionDescription32> {
     let opcode = inst.opcode();
     let neighbors = get_from_opcode(opcode).context("Can't find opcode")?;
     if neighbors.is_empty() {return Err(color_eyre::Report::msg(format!("Invalid opcode ({opcode}, {inst:?})")));}

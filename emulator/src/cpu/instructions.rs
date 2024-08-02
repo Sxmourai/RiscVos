@@ -53,7 +53,7 @@ impl Instruction32 {
 
     // 7 bits
     pub fn opcode(self) -> u8 {
-        self.0.get_bits(0..=6).try_into().unwrap() // Unwrap unchecked
+        self.0.get_bits(0..=6) as _ // Unwrap unchecked
     }
     // Only usefull if instruction is of type R, I, U, J
     // Destination register
@@ -62,7 +62,7 @@ impl Instruction32 {
         Reg::new(self._raw_rd())
     }
     pub fn _raw_rd(self) -> u8 {
-        self.0.get_bits(7..=11).try_into().unwrap() // Unwrap unchecked
+        self.0.get_bits(7..=11) as _ // Unwrap unchecked
     }
     // 4 bits
     // Register source 1
@@ -70,7 +70,7 @@ impl Instruction32 {
         Reg::new(self._raw_rs1())
     }
     pub fn _raw_rs1(self) -> u8 {
-        self.0.get_bits(15..=19).try_into().unwrap() // Unwrap unchecked
+        self.0.get_bits(15..=19) as _ // Unwrap unchecked
     }
     // 4 bits
     // Register source 2
@@ -78,7 +78,7 @@ impl Instruction32 {
         Reg::new(self._raw_rs2())
     }
     pub fn _raw_rs2(self) -> u8 {
-        self.0.get_bits(20..=24).try_into().unwrap() // Unwrap unchecked
+        self.0.get_bits(20..=24) as _ // Unwrap unchecked
     }
     // 2 bits (more info about operation)
     pub fn fun3(self) -> u32 {
@@ -163,7 +163,7 @@ impl Instruction16 {
         _s
     }
     pub fn opcode(self) -> u8 {
-        (self.0 & 0b11).try_into().unwrap()
+        (self.0 & 0b11) as _
     }
 }
 
