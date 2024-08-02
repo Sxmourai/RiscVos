@@ -372,7 +372,8 @@ mret
 ");
 
 
-pub fn init(callback: usize) {
+/// Initialises traps, and enters supervisor mode
+pub fn init() {
     info!("Initialising traps...");
     let mut supervisor_mstatus = riscv::MSTATUS(PrivilegeLevel::supervisor());
     supervisor_mstatus.set_mpie(true); // I think mpie should be set anyway, because we can't have spie and not mpie (see ISA / doc)
@@ -393,9 +394,10 @@ pub fn init(callback: usize) {
         csrw!("mie", 0xFFFF);
         csrw!("sie", 0xFFFF);
         csrw!("stvec", s_trap_vector as usize & !(0b11));
-        csrw!("mepc", callback);
         core::arch::asm!("
-        // csrw mepc, 
-        mret", options(noreturn));
+        la t0, 1f
+        csrw mepc, t0
+        mret
+        1:");
     }
 }

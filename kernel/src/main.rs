@@ -10,12 +10,8 @@ extern "C" fn kinit() {
     kernel::heap::init();
     kernel::pmp::init(); // Needed by QEMU for mret, see https://stackoverflow.com/questions/69133848/risc-v-illegal-instruction-exception-when-switching-to-supervisor-mode
     
-    kernel::traps::init(kmain as _);
-    unreachable!()
-}
-
-#[no_mangle]// Supervisor mode
-extern "C" fn kmain() {
+    kernel::traps::init();
+    // Supervisor mode
     kernel::plic::init();
     kernel::clint::init();
     kernel::paging::init();
