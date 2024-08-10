@@ -35,7 +35,7 @@ macro_rules! print {
     ($($args:tt)+) => ({
         use core::fmt::Write;
         #[allow(clippy::macro_metavars_in_unsafe)]
-        let _ = unsafe{write!($crate::logging::STDIO_UART.lock(), $($args)+)};
+        let _ = write!(unsafe{$crate::logging::STDIO_UART.lock()}, $($args)+);
     });
 }
 

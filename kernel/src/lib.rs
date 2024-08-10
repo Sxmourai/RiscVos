@@ -1,6 +1,6 @@
 #![no_std]
 
-#![cfg_attr(debug_assertions, allow(unused, dead_code))]
+#![cfg_attr(debug_assertions, allow(dead_code))]
 #![warn(unused_must_use)]
 #![warn(static_mut_refs)]
 #![cfg_attr(not(debug_assertions), warn(clippy::unwrap_used))]

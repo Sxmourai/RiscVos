@@ -36,13 +36,13 @@ impl CLINT {
         self.read::<u64>(CLINTRegs::MTime, 0)
     }
     pub fn set_interrupt_enabled(&mut self, enabled: bool) {
-        unsafe{self.write::<u32>(CLINTRegs::MSIP, 0, enabled as _)}
+        self.write::<u32>(CLINTRegs::MSIP, 0, enabled as _)
     }
     /// A timer interrupt is pending whenever
     /// mtime is greater than or equal to the value in the mtimecmp register. The timer interrupt is
     /// reflected in the mtip bit of the mip register described in Chapter 5
     pub fn set_mtimecmp(&mut self, value: u64) {
-        unsafe {self.write(CLINTRegs::MTimeCMP, 0, value)}
+        self.write(CLINTRegs::MTimeCMP, 0, value)
     }
 
     /// Triggers an interrupt in `duration` **cycles**

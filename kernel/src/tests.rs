@@ -34,7 +34,7 @@ pub fn log_err() {
     }
     println!("");
     if unsafe { MAIN_HEAP_ALLOCATOR.idx() } > 10000 {
-        dbg!(unsafe { MAIN_HEAP_ALLOCATOR.idx() });
+        dbg!(unsafe{MAIN_HEAP_ALLOCATOR.idx()});
     }
 }
 

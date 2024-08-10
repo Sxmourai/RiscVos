@@ -15,6 +15,7 @@ pub static mut MEMORY_PROTECTION: OnceCell<PMP> = OnceCell::new();
 
 // Memory Management Unit
 pub struct PMP {
+    #[allow(dead_code)]
     page_tables: [Table; 512],
 }
 impl Default for PMP {

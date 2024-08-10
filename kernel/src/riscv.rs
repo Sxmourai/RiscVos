@@ -6,6 +6,7 @@ macro_rules! csrr {
     }};
     ($reg: expr, $res: ty) => {{
         let mut res: $res;
+        #[allow(unused_unsafe)]
         unsafe{core::arch::asm!(concat!("csrr {}, ", $reg), out(reg) res)};
         res
     }};
@@ -169,19 +170,19 @@ extern "C" {
     static _heap_size: usize;    
 }
 pub fn stack_start() -> usize {
-    unsafe{core::ptr::addr_of!(_stack_start) as _}
+    core::ptr::addr_of!(_stack_start) as _
 }
 pub fn stack_end() -> usize {
-    unsafe{core::ptr::addr_of!(_stack_end) as _}
+    core::ptr::addr_of!(_stack_end) as _
 }
 pub fn heap_start() -> usize {
-    unsafe{core::ptr::addr_of!(_heap_start) as _}
+    core::ptr::addr_of!(_heap_start) as _
 }
 pub fn heap_size() -> usize {
-    unsafe{core::ptr::addr_of!(_heap_size) as _}
+    core::ptr::addr_of!(_heap_size) as _
 }
 pub fn memory_start() -> usize {
-    unsafe{core::ptr::addr_of!(_memory_start) as _}
+    core::ptr::addr_of!(_memory_start) as _
 }
 
 pub fn read_sp() -> u64 {
