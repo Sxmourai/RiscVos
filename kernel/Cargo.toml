@@ -2,7 +2,7 @@
 name = "kernel"
 version = "0.1.0"
 edition = "2021"
-exclude = ["/testing", "/testing/**"]
+exclude = ["**/tests", "**/tests/**"]
 
 [features]
 testing = []

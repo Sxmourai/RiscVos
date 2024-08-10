@@ -1,3 +1,4 @@
+#![allow(clippy::all)]
 pub fn test_read() {
     let mut blk = match unsafe { virtio::VIRTIO_DEVICES[7].as_mut().unwrap() } {
         virtio::VirtIODevicePtr::Block(blk) => blk,

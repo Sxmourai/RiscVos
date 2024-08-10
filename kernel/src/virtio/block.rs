@@ -100,7 +100,7 @@ impl BlockDevice {
         // divide to truncate the decimal. We don't add 4096,
         // because if it is exactly 4096 bytes, we would get two
         // pages, not one.
-        let num_pages = size_of::<Queue>().div_ceil(PAGE_SIZE);
+        let _num_pages = size_of::<Queue>().div_ceil(PAGE_SIZE);
         // Allocate 1 page for every device, but we will still be using the MMIO registers
         // ! Don't forget to use memory fences, cuz we need to have finished writing to memory before issuing a notify 
         unsafe { self.mmio.write(MmioOffset::QueueSel, 0) };
@@ -110,7 +110,7 @@ impl BlockDevice {
         // QueuePFN is a physical page number, however it
         // appears for QEMU we have to write the entire memory
         // address.
-        let mut addr = kalloc(2).ok()?;
+        let addr = kalloc(2).ok()?;
         unsafe {
             let _ = self.queue.replace(&mut *(addr as *mut Queue));
             self.mmio.write(MmioOffset::QueuePfn, (addr as u64 / PAGE_SIZE64) as u32);
@@ -150,7 +150,7 @@ impl BlockDevice {
             core::ptr::addr_of!(self.request.status) as u64, 
             1, VIRTIO_DESC_F_WRITE)?;
     
-        let mut queue = self.queue.as_mut()?;
+        let queue = self.queue.as_mut()?;
         queue.avail.ring[queue.avail.idx as usize] = head_idx as u16;
         queue.avail.idx = (((queue.avail.idx as usize) + 1) % VIRTIO_RING_SIZE) as _;
         // The only queue a block device has is 0, which is the request
@@ -166,7 +166,7 @@ impl BlockDevice {
 		// is one way to error check. We will eventually get back to 0 as
 		// this index is cyclical. However, it shows if the first read/write
 		// actually works.
-        let mut queue = self.queue.as_mut()?;
+        let queue = self.queue.as_mut()?;
         self.queue_idx = (self.queue_idx + 1) % VIRTIO_RING_SIZE;
         queue.desc[self.queue_idx] = desc;
         if queue.desc[self.queue_idx].flags & VIRTIO_DESC_F_NEXT != 0 {

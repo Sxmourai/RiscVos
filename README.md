@@ -44,6 +44,10 @@ python clippy.py --allow-dirty
 # Transforms into
 __CARGO_FIX_YOLO=1 cargo clippy --allow-dirty
 ```
+Personnaly I like:
+```bash
+python3 clippy.py --no-deps --fix --allow-dirty --lib -q -r
+```
 
 ## Getting virt infos:
 ```bash

@@ -1,7 +1,6 @@
-use paging::{get_root_pt, PageTableEntryFlags, PagingError, Sv39PhysicalAddress, Sv39VirtualAddress, PAGE_SIZE};
+use paging::{get_root_pt, PageTableEntryFlags, PagingError, Sv39VirtualAddress, PAGE_SIZE};
 
 use crate::*;
-use crate::riscv::*;
 pub struct HeapAllocator {
     page_heap_start: usize,
     page_heap_size: usize,
@@ -51,8 +50,8 @@ impl HeapAllocator {
         // Err(AllocationError::NoPagesAvailable)
     }
     //TODO Return Result
-    pub fn dealloc(&self, mut start: *mut Page, page_count: usize) {
-        let start_addr = start as usize;
+    pub fn dealloc(&self, start: *mut Page, _page_count: usize) {
+        let _start_addr = start as usize;
         // println!("{}", start_addr);
         // todo!()
     }
@@ -98,7 +97,7 @@ unsafe impl core::alloc::GlobalAlloc for HeapAllocator {
 
     #[track_caller]
     unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) {
-        Self::dealloc(&self, ptr as _, layout.size().div_ceil(PAGE_SIZE))
+        Self::dealloc(self, ptr as _, layout.size().div_ceil(PAGE_SIZE))
     }
 }
 

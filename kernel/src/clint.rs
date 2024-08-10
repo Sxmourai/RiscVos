@@ -1,5 +1,4 @@
 use core::time::Duration;
-use crate::*;
 
 
 pub enum CLINTRegs {

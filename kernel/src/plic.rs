@@ -18,9 +18,9 @@ pub enum PLICRegs {
 impl PLICRegs {
     pub fn addr(self) -> *mut u32 {
         match self {
-            Self::Priority(i)  =>  {let addr = (0x0c00_0000+4*i); assert!(i<=127 && i>0); addr as _}, 
-            Self::Pending(i)   =>  {let addr = (0x0c00_1000+4*i); assert!(i<=3); addr as _}, 
-            Self::Enable(i)    =>  {let addr = (0x0c00_2000+4*i); assert!(i<=3); addr as _}, 
+            Self::Priority(i)  =>  {let addr = 0x0c00_0000+4*i; assert!(i<=127 && i>0); addr as _}, 
+            Self::Pending(i)   =>  {let addr = 0x0c00_1000+4*i; assert!(i<=3); addr as _}, 
+            Self::Enable(i)    =>  {let addr = 0x0c00_2000+4*i; assert!(i<=3); addr as _}, 
             Self::Threshold =>  0x0c20_0000 as _, 
             Self::Claim     =>  0x0c20_0004 as _, 
             Self::Complete  =>  0x0c20_0004 as _, 

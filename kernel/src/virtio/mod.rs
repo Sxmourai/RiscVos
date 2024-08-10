@@ -6,8 +6,8 @@ pub mod gpu;
 pub mod input;
 pub mod memory;
 
-use alloc::{boxed::Box, format, string::ToString, vec::{self, Vec}};
-use log::{info, warn};
+use alloc::{boxed::Box, format, string::String, vec::{Vec}};
+use log::warn;
 
 use crate::{*, paging::{PAGE_SIZE, PAGE_SIZE64}};
 
@@ -28,7 +28,7 @@ pub const VIRTIO_DESC_F_INDIRECT: u16 = 4;
 pub fn init() {
     crate::info!("Probing Virtio devices...");
     for addr in (VIRTIO_START..=VIRTIO_END).step_by(VIRTIO_STRIDE) {
-        map!(addr);
+        unsafe{map!(addr)};
         crate::trace!("Virtio probing 0x{:08x}...", addr);
         let magicvalue;
         let deviceid;
@@ -132,7 +132,7 @@ impl core::fmt::Debug for Available {
         f.debug_struct("Available")
         .field("flags", &self.flags)
         .field("idx", &self.idx)
-        .field("ring", &self.ring.iter().map(|x| format!("{x} ")).collect::<alloc::string::String>())
+        .field("ring", &self.ring.iter().fold(String::new(), |mut s,x| {s.push_str(&format!("{x} "));s}))
         .field("event", &self.event).finish()
     }
 }
@@ -269,9 +269,9 @@ pub enum MmioOffset {
     /// Reading from this register returns a bit mask of events that caused the device interrupt to be asserted. The following events are possible:
     /// Used Buffer Notification
     /// - bit 0 - the interrupt was asserted because the device has used a buffer in at least one of the active virtual queues.
-    /// Configuration Change Notification
+    ///   Configuration Change Notification
     /// - bit 1 - the interrupt was asserted because the configuration of the device has changed
-    /// Read-only
+    ///   Read-only
     InterruptStatus = 0x060,
     /// Writing a value with bits set as defined in InterruptStatus to this register notifies the device that events causing the interrupt have been handled
     /// Write-only

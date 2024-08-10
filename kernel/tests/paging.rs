@@ -1,6 +1,6 @@
+#![allow(clippy::all)]
 #![no_std]
 #![feature(custom_inner_attributes)]
-#![clippy::allow(all)]
 
 pub fn paging_rw() {
     use crate::paging::*;

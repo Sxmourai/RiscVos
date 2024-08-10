@@ -1,7 +1,7 @@
 use core::cell::OnceCell;
 
 use bitfield::bitfield;
-use riscv::{enter_mode, get_mode, memory_start, stack_end, stack_start, PrivilegeLevel, SATP};
+use riscv::{memory_start, stack_end, SATP};
 
 use crate::*;
 
@@ -244,6 +244,12 @@ pub struct PageTable {
     pub entries: [PageTableEntry; 512],
 }
 
+impl Default for PageTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PageTable {
     pub fn new() -> Self {
         Self {
@@ -263,6 +269,8 @@ impl PageTable {
         }
         Ok(())
     }
+    /// # Safety
+    /// Ultimate memory breaker
     pub unsafe fn map(&mut self, vaddr: Sv39VirtualAddress, paddr: Sv39PhysicalAddress, flags: PageTableEntryFlags) -> Result<&'_ mut PageTableEntry, PagingError> {
         assert!(PageTableEntry(flags.0).is_leaf());
         let mut level = 3;
@@ -272,7 +280,7 @@ impl PageTable {
                 panic!("Not found ?")
             }
             level -= 1;
-            let mut pte = &mut current_page_table.entries[vaddr.vpn(level) as usize];
+            let pte = &mut current_page_table.entries[vaddr.vpn(level) as usize];
             // CAUTION! If accessing pte violates a PMA or PMP check, raise an access-fault exception corresponding to the
             // original access type
             if !pte.valid() {
@@ -293,6 +301,8 @@ impl PageTable {
         *leaf_pte = PageTableEntry::with_phys_pn(paddr).apply_flags(flags);
         Ok(leaf_pte)
     }
+    /// # Safety
+    /// Like map
     pub unsafe fn map_range(&mut self, start: Sv39VirtualAddress, page_count: u64, flags: PageTableEntryFlags) -> Result<(), PagingError> {
         for i in 0..page_count {
             let page_idx = i*PAGE_SIZE64;
@@ -349,7 +359,7 @@ pub fn get_page(vaddr: Sv39VirtualAddress) -> Result<&'static PageTableEntry, Pa
             panic!("Not found ?")
         }
         level -= 1;
-        let mut pte = &current_page_table.entries[vaddr.vpn(level) as usize];
+        let pte = &current_page_table.entries[vaddr.vpn(level) as usize];
         if !pte.valid() {
             return Err(PagingError::InvalidEntry(pte.clone()));
         }
@@ -368,7 +378,7 @@ macro_rules! map {
         $crate::map!($vaddr, $vaddr, flags=$crate::paging::PageTableEntryFlags::rwx())
     };
     ($vaddr: expr, count=$count: expr) => {
-        unsafe{$crate::paging::get_root_pt()?.map_range($crate::paging::Sv39VirtualAddress($vaddr as _), $count, $crate::paging::PageTableEntryFlags::rwx())?}
+        {$crate::paging::get_root_pt()?.map_range($crate::paging::Sv39VirtualAddress($vaddr as _), $count, $crate::paging::PageTableEntryFlags::rwx())?}
     };
     ($vaddr: expr, $paddr: expr) => {
         $crate::map!($vaddr, $paddr, flags=$crate::paging::PageTableEntryFlags::rwx())
@@ -377,7 +387,7 @@ macro_rules! map {
         $crate::map!($vaddr, $vaddr, $flags) // Or $crate::heap::kalloc(1).unwrap() as *mut $crate::paging::PageTable
     };
     ($vaddr: expr, $paddr: expr, flags=$flags: expr) => {
-        unsafe{$crate::paging::get_root_pt().unwrap().map($crate::paging::Sv39VirtualAddress($vaddr as _), $crate::paging::Sv39PhysicalAddress($paddr as _), $flags).unwrap()}
+        {$crate::paging::get_root_pt().unwrap().map($crate::paging::Sv39VirtualAddress($vaddr as _), $crate::paging::Sv39PhysicalAddress($paddr as _), $flags).unwrap()}
     };
 }
 
@@ -388,15 +398,12 @@ pub fn init() {
     let root_page_table_ptr = crate::heap::kalloc(1).unwrap() as *mut PageTable;
     satp.set_ppn((root_page_table_ptr as u64) >> 12); // 2^12=4096
     let rpt = unsafe {&mut *(root_page_table_ptr)};
-    // dbg!(memory_start(), stack_end()+PAGE_SIZE*100);
-    // dbg!(heap_start(), heap_size()/PAGE_SIZE);
-    // dbg!(((stack_end()+PAGE_SIZE*100)-memory_start())/4096);
     for page in (memory_start()..stack_end()+PAGE_SIZE*200).step_by(PAGE_SIZE) {
         unsafe{rpt.map(Sv39VirtualAddress(page as _), Sv39PhysicalAddress(page as _), PageTableEntryFlags(0b1111)).unwrap()};
     }
-    // unsafe{rpt.map(Sv39VirtualAddress(0x1000_0000 as _), Sv39PhysicalAddress(0x1000_0000 as _), PageTableEntryFlags(0b1111)).unwrap()};
     unsafe { csrw!("satp", satp.0) };
-    map!(0x1000_0000);
+    // Map UART
+    unsafe{map!(0x1000_0000)};
 }
 
 // Sv32:

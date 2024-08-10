@@ -1,6 +1,6 @@
 use bitfield::bitfield;
 
-use crate::{csrw, dbg};
+use crate::csrw;
 
 pub enum PMPConfigRegFormatA {
     Disabled = 0,
