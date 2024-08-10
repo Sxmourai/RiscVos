@@ -59,6 +59,20 @@ impl HeapAllocator {
     pub fn page_heap_end(&self) -> usize {self.page_heap_start+self.page_heap_size}
 }
 
+pub struct LittleAllocator {
+    start: usize,
+    size: usize,
+    current_offset: usize,
+}
+impl LittleAllocator {
+    pub fn end(&self) -> usize {self.start+self.size}
+    pub fn alloc(&mut self, size: usize) -> *mut u8 {
+        assert!(self.start+size<=self.end());
+        (self.start+self.current_offset) as _
+    }
+}
+
+
 #[derive(Debug)]
 pub enum AllocationError {
     Paging(PagingError),
@@ -73,9 +87,12 @@ impl From<PagingError> for AllocationError {
 unsafe impl core::alloc::GlobalAlloc for HeapAllocator {
     #[track_caller]
     unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
+        if layout.size() <= 512 {
+            return unsafe{LITTLE_HEAP_ALLOCATOR.alloc(layout.size())}
+        }
         let ptr = Self::alloc(self, layout.size().div_ceil(PAGE_SIZE)).unwrap();
-        // let alignment = layout.align();
-        // println!("{} {}", alignment, layout.size());
+        let alignment = layout.align();
+        println!("{} {}", alignment, layout.size());
         ptr as _
     }
 
@@ -122,12 +139,15 @@ impl Page {
 
 #[global_allocator]
 pub static mut MAIN_HEAP_ALLOCATOR: HeapAllocator = HeapAllocator {page_heap_start:0,page_heap_size:0, idx: spin::Mutex::new(0), };
+pub static mut LITTLE_HEAP_ALLOCATOR: LittleAllocator = LittleAllocator {start:0,size:0, current_offset: 0, };
 
 pub fn init() {
     info!("Initialising heap...");
     // Idk why, it should be the value, but the value is 0 and the address is the value...
     unsafe{MAIN_HEAP_ALLOCATOR.page_heap_start = heap_start().div_ceil(PAGE_SIZE)};
     unsafe{MAIN_HEAP_ALLOCATOR.page_heap_size = heap_size()/PAGE_SIZE};
+    unsafe{LITTLE_HEAP_ALLOCATOR.start = heap_start()+10*1024};
+    unsafe{LITTLE_HEAP_ALLOCATOR.size = 8*1024};
     assert!(heap_size()>5000, "Don't have enough memory !");
     // assert_eq!(unsafe{MAIN_HEAP_ALLOCATOR.page_heap_start}, 0);
     // We now have Vecs & others ! 
@@ -139,5 +159,7 @@ pub fn kalloc(page_count: usize) -> Result<*mut Page, AllocationError> {
     }
 }
 pub fn kmalloc(bytes: usize) -> Result<*mut Page, AllocationError> {
-    kalloc(bytes.div_ceil(PAGE_SIZE))
+    unsafe {
+        Ok(LITTLE_HEAP_ALLOCATOR.alloc(bytes) as _)
+    }
 }
