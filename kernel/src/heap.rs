@@ -19,7 +19,7 @@ impl HeapAllocator {
         let mut idx = self.idx.lock();
         let page_start = unsafe {((self.page_heap_start*PAGE_SIZE) as *mut Page).add(*idx)};
         if *idx+page_count>self.page_heap_size {return Err(AllocationError::NoPagesAvailable)}
-        unsafe{
+        unsafe {
             if let Ok(rpt) = get_root_pt() {
                 rpt.map_range(Sv39VirtualAddress(page_start as u64), page_count as u64, PageTableEntryFlags::rwx())?
             }
